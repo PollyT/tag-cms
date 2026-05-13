@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMS Tag Management Demo</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        trip: {
+                            50: '#f2f6ff',
+                            100: '#e6eeff',
+                            200: '#d1e0ff',
+                            300: '#adc7ff',
+                            400: '#85a4ff',
+                            500: '#5c7aff',
+                            600: '#3264fa', // Primary Trip Blue
+                            700: '#284ed1',
+                            800: '#1d39a8',
+                            900: '#132580',
+                        },
+                        accent: {
+                            DEFAULT: '#ff9d00', // Trip.com orange accent
+                            hover: '#e68a00'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Frame Motion (browser build) -->
+    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, createContext, useContext } = React;
+        const { motion, AnimatePresence } = window.Motion;
+
+        // --- Constants & Mock Data ---
+        const LOCALES = [
+            { id: 'en', label: 'EN' },
+            { id: 'tw', label: 'TW' },
+            { id: 'hk', label: 'HK' },
+            { id: 'jp', label: 'JP' },
+            { id: 'kr', label: 'KR' },
+            { id: 'th', label: 'TH' },
+            { id: 'ru', label: 'RU' },
+            { id: 'my', label: 'MY' },
+        ];
+
+        const INITIAL_TAG_NAMES = ['Airports', 'Train Stations', 'Lounge', 'Luggage Storage', 'Duty-Free', 'Airport Food', 'Transit/Layovers', 'Maps', 'Metro', 'City Bus', 'Taxis', 'Car Rental', 'Hotels', 'Resorts', 'Luxury Hotel', 'Visa', 'Passport', 'eSIM/Phone', 'Weather', 'Things to Do', 'Shopping', 'Souvenirs', 'Museums', 'Theme Parks', 'Restaurants', 'Cherry Blossom'];
+        const INITIAL_GEO_NAMES = ['China', 'Japan', 'Shenzhen', 'Hong Kong', 'Tokyo', 'Shanghai', 'Guangzhou', 'Zhuhai', 'Osaka', 'Fukuoka', 'Kyoto'];
+
+        const INITIAL_TAGS = [
+            ...INITIAL_TAG_NAMES.map((name, i) => ({
+                id: `t${i}`,
+                name,
+                slug: name.toLowerCase().replace(/ /g, '-'),
+                type: 'general',
+                locales: { tw: name, hk: name, jp: name },
+                description: `${name} related content`,
+                h1: name,
+                articleCount: Math.floor(Math.random() * 50),
+                status: 'active',
+                updatedAt: new Date(Date.now() - Math.random() * 1000000000).toISOString()
+            })),
+            ...INITIAL_GEO_NAMES.map((name, i) => ({
+                id: `g${i}`,
+                name,
+                slug: name.toLowerCase().replace(/ /g, '-'),
+                type: 'geo',
+                locales: { tw: name, hk: name, jp: name },
+                description: `${name} destinations`,
+                h1: name,
+                articleCount: Math.floor(Math.random() * 100),
+                status: 'active',
+                updatedAt: new Date(Date.now() - Math.random() * 1000000000).toISOString()
+            }))
+        ];
+
+        const INITIAL_ARTICLES = [
+            { id: 'art1', title: 'Weekend Getaway in SZ', content: '...', tags: ['t0', 'g2'], updatedAt: new Date().toISOString() },
+            { id: 'art2', title: 'Tokyo Station Guide', content: '...', tags: ['t1', 'g4'], updatedAt: new Date().toISOString() },
+        ];
+
+        const INITIAL_AUDIT = [
+            { id: 'a1', name: 'MixC World Shenzhen Bay', sourceArticle: 'Weekend Getaway in SZ', confidence: 0.95, type: 'general', status: 'pending', createdAt: new Date().toISOString() },
+            { id: 'a2', name: 'Skyworthland CINITY Cinema', sourceArticle: 'Movie Night in Nanshan', confidence: 0.88, type: 'general', status: 'pending', createdAt: new Date().toISOString() },
+            { id: 'a3', name: 'Macau', sourceArticle: 'Cross-border Travel Tips', confidence: 0.99, type: 'geo', status: 'pending', createdAt: new Date().toISOString() },
+            { id: 'a4', name: 'Locker Info', sourceArticle: 'Tokyo Station Guide', confidence: 0.92, type: 'general', status: 'pending', createdAt: new Date().toISOString() },
+        ];
+
+        const INITIAL_TAG_PAGES = [
+            { id: 'p0', name: 'Tokyo Theme Parks', site: 'en', tags: ['t23', 'g4'], articleCount: 12, status: 'published', createdAt: new Date().toISOString() },
+            { id: 'p1', name: 'Tokyo Airports', site: 'en', tags: ['t0', 'g4'], articleCount: 15, status: 'published', createdAt: new Date().toISOString() },
+            { id: 'p2', name: 'Shenzhen Shopping', site: 'tw', tags: ['t20', 'g2'], articleCount: 8, status: 'pending', createdAt: new Date().toISOString() },
+        ];
+
+        // --- Icons Wrapper ---
+        const Icon = ({ name, className = "w-4 h-4" }) => {
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            }, [name]);
+            return <i data-lucide={name} className={className}></i>;
+        };
+
+        // --- Helper ---
+        const formatTime = (iso) => {
+            const date = new Date(iso);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        };
+
+        // --- Components ---
+
+        const Sidebar = ({ activeView, setActiveView, counts }) => {
+            const menuItems = [
+                { id: 'tags', label: 'Tag Management', icon: 'tag' },
+                { id: 'editor', label: 'Article Editor', icon: 'file-text' },
+                { id: 'audit', label: 'Audit Queue', icon: 'shield-alert', count: counts.audit },
+                { id: 'generator', label: 'Page Generator', icon: 'layers' },
+                { id: 'pages', label: 'Tag Pages', icon: 'layout' },
+            ];
+
+            return (
+                <div className="w-64 bg-white border-r border-slate-200 h-full flex flex-col shrink-0">
+                    <div className="p-6 border-b border-slate-100 uppercase tracking-tighter font-black text-xl text-trip-600 flex items-center gap-2">
+                        <Icon name="tag" className="w-6 h-6" /> TagCMS
+                    </div>
+                    <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+                        {menuItems.map(item => (
+                            <button
+                                key={item.id}
+                                onClick={() => setActiveView(item.id)}
+                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                                    activeView === item.id 
+                                    ? 'bg-trip-600 text-white shadow-lg shadow-trip-200' 
+                                    : 'text-slate-600 hover:bg-trip-50'
+                                }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <Icon name={item.icon} className={activeView === item.id ? 'text-white' : 'text-trip-400'} />
+                                    {item.label}
+                                </div>
+                                {item.count > 0 && (
+                                    <span className={`${activeView === item.id ? 'bg-white text-trip-600' : 'bg-accent text-white'} text-[10px] px-1.5 py-0.5 rounded-full font-bold`}>
+                                        {item.count}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </nav>
+                </div>
+            );
+        };
+
+        const TagManagementView = ({ tags, onUpdate, onDelete, onAdd }) => {
+            const [searchTerm, setSearchTerm] = useState('');
+            const [typeFilter, setTypeFilter] = useState('all');
+            const [selectedLocale, setSelectedLocale] = useState('en');
+            const [editingTag, setEditingTag] = useState(null);
+            const [isAdding, setIsAdding] = useState(false);
+
+            const filteredTags = useMemo(() => {
+                return tags.filter(t => {
+                    const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                        t.slug.toLowerCase().includes(searchTerm.toLowerCase());
+                    const matchesType = typeFilter === 'all' || t.type === typeFilter;
+                    return matchesSearch && matchesType;
+                });
+            }, [tags, searchTerm, typeFilter]);
+
+            return (
+                <div className="flex flex-col h-full bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                    <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4 bg-slate-50/50">
+                        <div className="flex items-center gap-2 flex-1 min-w-[300px]">
+                            <div className="relative flex-1">
+                                <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search tags..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-trip-500/20"
+                                />
+                            </div>
+                            <select value={typeFilter} onChange={(e)=>setTypeFilter(e.target.value)} className="bg-white border border-slate-200 text-sm rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-trip-500/20">
+                                <option value="all">Types</option>
+                                <option value="general">General</option>
+                                <option value="geo">Geo</option>
+                            </select>
+                            <select value={selectedLocale} onChange={(e)=>setSelectedLocale(e.target.value)} className="bg-white border border-slate-200 text-sm rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-trip-500/20">
+                                {LOCALES.map(loc => <option key={loc.id} value={loc.id}>{loc.label}</option>)}
+                            </select>
+                        </div>
+                        <button onClick={() => setIsAdding(true)} className="bg-trip-600 hover:bg-trip-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-trip-100">
+                            <Icon name="plus" /> New Tag
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-auto">
+                        <table className="w-full text-left text-sm border-separate border-spacing-0">
+                            <thead className="bg-white text-slate-400 text-[10px] uppercase font-bold sticky top-0 z-10 border-b border-slate-100">
+                                <tr>
+                                    <th className="px-6 py-4 border-b border-slate-100 bg-white">Tag Name</th>
+                                    <th className="px-6 py-4 border-b border-slate-100 bg-white">Translation ({selectedLocale})</th>
+                                    <th className="px-6 py-4 border-b border-slate-100 bg-white">Type</th>
+                                    <th className="px-6 py-4 border-b border-slate-100 bg-white text-center">Items</th>
+                                    <th className="px-6 py-4 border-b border-slate-100 bg-white">Updated</th>
+                                    <th className="px-6 py-4 border-b border-slate-100 bg-white">Status</th>
+                                    <th className="px-6 py-4 border-b border-slate-100 bg-white text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {filteredTags.map(tag => (
+                                    <tr key={tag.id} className="hover:bg-trip-50/30 transition-colors group">
+                                        <td className="px-6 py-4 font-bold text-slate-800">
+                                            {tag.name}
+                                            <div className="text-[10px] text-trip-400 font-mono mt-0.5">{tag.slug}</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-600">
+                                            {tag.locales[selectedLocale] || <span className="text-slate-200 italic">None</span>}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${tag.type === 'geo' ? 'bg-trip-100 text-trip-700' : 'bg-amber-50 text-amber-600'}`}>
+                                                {tag.type}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <span className="font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-600">{tag.articleCount}</span>
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-400 text-[11px]">
+                                            {formatTime(tag.updatedAt)}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${tag.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                                                {tag.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => setEditingTag(tag)} className="p-2 text-slate-400 hover:text-trip-600 hover:bg-trip-50 rounded-lg">
+                                                    <Icon name="edit" />
+                                                </button>
+                                                <button onClick={() => onDelete(tag.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+                                                    <Icon name="trash-2" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <AnimatePresence>
+                        {(editingTag || isAdding) && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setEditingTag(null); setIsAdding(false); }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+                                <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden p-8">
+                                    <h3 className="text-2xl font-black text-slate-800 mb-6">{isAdding ? 'New Tag' : 'Edit Tag'}</h3>
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Name</label>
+                                                <input type="text" id="tagNameInput" defaultValue={editingTag?.name || ''} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:ring-2 focus:ring-trip-500/20 outline-none" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Type</label>
+                                                <select id="tagTypeInput" defaultValue={editingTag?.type || 'general'} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-trip-500/20">
+                                                    <option value="general">General</option>
+                                                    <option value="geo">Geo</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">Description</label>
+                                            <textarea id="tagDescInput" defaultValue={editingTag?.description || ''} rows="3" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-trip-500/20" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">H1 Title</label>
+                                            <input type="text" id="tagH1Input" defaultValue={editingTag?.h1 || editingTag?.name || ''} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-trip-500/20" />
+                                        </div>
+                                    </div>
+                                    <div className="mt-8 flex justify-end gap-3">
+                                        <button onClick={() => { setEditingTag(null); setIsAdding(false); }} className="px-6 py-3 text-sm font-bold text-slate-400 hover:bg-slate-50 rounded-2xl transition-colors">Cancel</button>
+                                        <button onClick={() => {
+                                            const payload = {
+                                                name: document.getElementById('tagNameInput').value,
+                                                type: document.getElementById('tagTypeInput').value,
+                                                description: document.getElementById('tagDescInput').value,
+                                                h1: document.getElementById('tagH1Input').value
+                                            };
+                                            isAdding ? onAdd(payload) : onUpdate(editingTag.id, payload);
+                                            setEditingTag(null); setIsAdding(false);
+                                        }} className="px-10 py-3 bg-trip-600 text-white rounded-2xl text-sm font-bold shadow-xl shadow-trip-500/20 active:scale-95 transition-all">
+                                            {isAdding ? 'Create' : 'Save'}
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            </div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            );
+        };
+
+        const ArticleEditorView = ({ tags, onAddAudit }) => {
+            const [title, setTitle] = useState('');
+            const [content, setContent] = useState('');
+            const [selectedTags, setSelectedTags] = useState([]);
+            const [tagSearch, setTagSearch] = useState('');
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+            const filteredTags = useMemo(() => {
+                if (!tagSearch) return [];
+                return tags.filter(t => t.name.toLowerCase().includes(tagSearch.toLowerCase()) && !selectedTags.includes(t.id)).slice(0, 5);
+            }, [tags, tagSearch, selectedTags]);
+
+            const handleAnalyze = () => {
+                setIsAnalyzing(true);
+                setTimeout(() => {
+                    const suggested = tags.filter(t => (title + content).toLowerCase().includes(t.name.toLowerCase())).map(t => t.id);
+                    setSelectedTags(prev => [...new Set([...prev, ...suggested])]);
+                    setIsAnalyzing(false);
+                    alert('AI Analysis complete. Suggested tags added!');
+                }, 1000);
+            };
+
+            return (
+                <div className="h-full flex flex-col gap-6 overflow-hidden">
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xl font-black text-slate-800">Article Editor</h2>
+                            <button onClick={handleAnalyze} disabled={isAnalyzing} className="flex items-center gap-2 px-4 py-2 bg-trip-600 text-white rounded-xl text-sm font-bold transition-all hover:bg-trip-700 disabled:opacity-50 shadow-lg shadow-trip-100">
+                                {isAnalyzing ? <Icon name="loader" className="animate-spin" /> : <Icon name="sparkles" />}
+                                Smart Tagging
+                            </button>
+                        </div>
+                        <input value={title} onChange={e=>setTitle(e.target.value)} type="text" placeholder="Article Title" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-lg font-bold outline-none mb-4 focus:ring-2 focus:ring-trip-500/20" />
+                        <div className="mb-4">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase mb-2 ml-1">Applied Tags</div>
+                            <div className="flex flex-wrap gap-2 mb-2 p-2 bg-slate-50 rounded-xl border border-dashed border-slate-300 min-h-[46px]">
+                                {selectedTags.map(tid => {
+                                    const tag = tags.find(t => t.id === tid);
+                                    return (
+                                        <span key={tid} className="px-3 py-1 bg-white border border-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-2 group">
+                                            {tag?.name}
+                                            <button onClick={()=>setSelectedTags(prev => prev.filter(i=>i!==tid))} className="text-slate-300 hover:text-red-500"><Icon name="x" className="w-3 h-3" /></button>
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                            <div className="relative">
+                                <Icon name="plus" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input value={tagSearch} onChange={e=>setTagSearch(e.target.value)} type="text" placeholder="Add tag..." className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-trip-500/20" />
+                                {filteredTags.length > 0 && (
+                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-10 overflow-hidden">
+                                        {filteredTags.map(t => (
+                                            <button key={t.id} onClick={()=>{setSelectedTags([...selectedTags, t.id]); setTagSearch('');}} className="w-full text-left px-4 py-2.5 text-sm hover:bg-trip-50 border-b last:border-0 border-slate-50 font-medium tracking-tight">
+                                                {t.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col min-h-0">
+                        <div className="flex items-center gap-4 px-6 py-3 border-b border-slate-100 bg-slate-50/50">
+                            <button className="p-1.5 text-slate-400 hover:text-slate-600"><Icon name="bold" /></button>
+                            <button className="p-1.5 text-slate-400 hover:text-slate-600"><Icon name="italic" /></button>
+                            <button className="p-1.5 text-slate-400 hover:text-slate-600"><Icon name="list" /></button>
+                            <div className="w-px h-4 bg-slate-200" />
+                            <button className="p-1.5 text-slate-400 hover:text-slate-600"><Icon name="image" /></button>
+                            <button className="p-1.5 text-slate-400 hover:text-slate-600"><Icon name="link" /></button>
+                        </div>
+                        <textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="Start writing article content..." className="flex-1 w-full p-6 outline-none text-slate-700 resize-none font-serif leading-relaxed" />
+                    </div>
+                </div>
+            );
+        };
+
+        const TagPageGeneratorView = ({ tags, onGenerate }) => {
+            const [selectedSite, setSelectedSite] = useState('en');
+            const [selectedTags, setSelectedTags] = useState([]);
+            const [search, setSearch] = useState('');
+
+            const filtered = tags.filter(t => t.name.toLowerCase().includes(search.toLowerCase()) && !selectedTags.includes(t.id));
+
+            return (
+                <div className="h-full flex gap-6">
+                    <div className="flex-1 flex flex-col gap-6">
+                        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                            <h3 className="text-lg font-black text-slate-800 mb-6">Create Landing Page</h3>
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Target Site</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {LOCALES.map(loc => (
+                                            <button key={loc.id} onClick={()=>setSelectedSite(loc.id)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${selectedSite === loc.id ? 'bg-trip-600 border-trip-600 text-white shadow-lg shadow-trip-100' : 'bg-white border-slate-200 text-slate-500 hover:border-trip-200'}`}>
+                                                {loc.label} Site
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Configure Intersection (AND)</label>
+                                    <div className="flex flex-wrap gap-2 p-4 bg-slate-50 rounded-2xl border border-slate-200 min-h-[100px] focus-within:ring-2 focus-within:ring-trip-500/10 transition-all">
+                                        {selectedTags.map(tid => {
+                                            const tag = tags.find(t => t.id === tid);
+                                            return (
+                                                <span key={tid} className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-700 flex items-center gap-2 shadow-sm hover:border-trip-300 transition-colors">
+                                                    {tag?.name}
+                                                    <button onClick={()=>setSelectedTags(prev=>prev.filter(i=>i!==tid))} className="text-slate-300 hover:text-red-500"><Icon name="x" className="w-4 h-4" /></button>
+                                                </span>
+                                            );
+                                        })}
+                                        {selectedTags.length === 0 && <span className="text-slate-300 italic text-sm self-center justify-self-center w-full text-center">Select tags from pool to intersect...</span>}
+                                    </div>
+                                </div>
+                                <button disabled={selectedTags.length === 0} onClick={() => onGenerate(selectedSite, selectedTags)} className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-black text-sm transition-all shadow-xl shadow-slate-200 active:scale-[0.98] disabled:opacity-30">
+                                    Generate Component Page
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="w-96 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+                        <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                            <div className="relative">
+                                <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input value={search} onChange={e=>setSearch(e.target.value)} type="text" placeholder="Search Tag Pool..." className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-trip-500/20" />
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                            {filtered.map(t => (
+                                <button key={t.id} onClick={()=>setSelectedTags([...selectedTags, t.id])} className="w-full text-left p-3 rounded-xl border border-slate-100 hover:bg-trip-50 hover:border-trip-100 transition-all group">
+                                    <div className="font-bold text-slate-700 text-sm group-hover:text-trip-700">{t.name}</div>
+                                    <div className="text-[10px] text-slate-400 font-medium uppercase mt-0.5">{t.type} • {t.articleCount} Articles</div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const TagPageListView = ({ pages, tags, onDelete, onStatusChange, onPreview }) => {
+            return (
+                <div className="h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+                    <div className="p-6 border-b border-slate-50 flex items-center justify-between">
+                        <h2 className="text-xl font-black text-slate-800">Generated Tag Pages</h2>
+                    </div>
+                    <div className="flex-1 overflow-auto">
+                        <table className="w-full text-left text-sm whitespace-nowrap">
+                            <thead className="bg-slate-50 text-slate-400 font-bold text-[10px] uppercase tracking-widest sticky top-0">
+                                <tr>
+                                    <th className="px-6 py-4">Page Title</th>
+                                    <th className="px-6 py-4">Site</th>
+                                    <th className="px-6 py-4">Intersection</th>
+                                    <th className="px-6 py-4">Items</th>
+                                    <th className="px-6 py-4">Status</th>
+                                    <th className="px-6 py-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {pages.map(page => (
+                                    <tr key={page.id} className="hover:bg-slate-50/50 transition-colors group">
+                                        <td className="px-6 py-4">
+                                            <div className="font-bold text-slate-800">{page.name}</div>
+                                            <div className="text-[10px] text-slate-400 font-mono mt-0.5 capitalize">Created {formatTime(page.createdAt)}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-bold uppercase">{page.site}</span>
+                                        </td>
+                                        <td className="px-6 py-4 font-mono text-[11px] text-slate-400">
+                                            <div className="flex flex-wrap gap-1">
+                                                {page.tags.map(tid => <span key={tid} className="bg-slate-50 px-1.5 rounded">#{tags.find(t=>t.id===tid)?.name}</span>)}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 font-mono font-bold text-trip-600">{page.articleCount}</td>
+                                        <td className="px-6 py-4">
+                                            <button onClick={() => onStatusChange(page.id, page.status === 'published' ? 'pending' : 'published')} className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tighter border-2 ${page.status === 'published' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                                {page.status}
+                                            </button>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button onClick={() => onPreview(page)} className="p-2 text-slate-400 hover:text-trip-600 hover:bg-trip-50 rounded-xl"><Icon name="eye" /></button>
+                                                <button onClick={() => onDelete(page.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl"><Icon name="trash-2" /></button>
+                                            </div>
+                                        </td>d>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        };
+
+        const TagPagePreview = ({ page, tags, onClose }) => {
+            if (!page) return null;
+
+            const selectedTags = page.tags.map(tid => tags.find(t => t.id === tid)).filter(Boolean);
+            const siteTag = selectedTags.find(t => t.type === 'geo') || selectedTags[0];
+            const topicTag = selectedTags.find(t => t.type === 'general') || selectedTags[selectedTags.length - 1];
+
+            const seo = {
+                title: `${page.name} - Best Travel Guide ${new Date().getFullYear()}`,
+                description: `Explore the best of ${page.name}. Find guides, tips, and hidden gems for your next adventure.`,
+                keywords: selectedTags.map(t => t.name).join(', ')
+            };
+
+            const hotTags = tags.filter(t => t.articleCount > 40).slice(0, 8);
+            const relatedTags = tags.filter(t => !page.tags.includes(t.id) && t.type === topicTag?.type).slice(0, 5);
+
+            return (
+                <div className="fixed inset-0 z-[100] flex flex-col bg-white overflow-hidden pointer-events-auto font-sans">
+                    {/* CMS Tools Control Bar */}
+                    <div className="bg-slate-900 text-white px-6 py-3 flex items-center justify-between border-b border-white/10 shrink-0">
+                        <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-2 text-trip-400 font-black tracking-tighter uppercase">
+                                <Icon name="layout" className="w-5 h-5" /> PREVIEW MODE
+                            </div>
+                            <div className="flex items-center gap-4 text-xs font-medium text-slate-400">
+                                <span className="flex items-center gap-1.5"><Icon name="monitor" className="w-3 h-3" /> Desktop</span>
+                                <span className="flex items-center gap-1.5"><Icon name="globe" className="w-3 h-3" /> {page.site.toUpperCase()}</span>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <button className="px-5 py-2 bg-trip-600 hover:bg-trip-700 rounded-xl text-xs font-bold transition-all shadow-lg shadow-trip-900/20">Publish Live</button>
+                            <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"><Icon name="x" /></button>
+                        </div>
+                    </div>
+
+                    {/* SEO Metadata View (For Review) */}
+                    <div className="bg-slate-100 border-b border-slate-200 px-6 py-4 flex flex-col gap-2 shrink-0">
+                        <div className="flex items-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            <Icon name="search" className="w-3 h-3" /> Search Engine Preview
+                        </div>
+                        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <div className="text-[#1a0dab] text-xl hover:underline cursor-pointer font-medium leading-tight mb-1 truncate">{seo.title}</div>
+                            <div className="text-[#006621] text-sm mb-1 truncate">https://www.trip.com/blog/{page.site}/{topicTag?.slug}/{siteTag?.slug}</div>
+                            <div className="text-[#545454] text-sm leading-snug line-clamp-2">{seo.description}</div>
+                        </div>
+                    </div>
+
+                    {/* The Actual Page Content */}
+                    <div className="flex-1 overflow-y-auto bg-white scroll-smooth">
+                        {/* Page Header / Breadcrumb */}
+                        <div className="max-w-6xl mx-auto px-6 py-10">
+                            <div className="flex items-center gap-2 text-xs text-slate-400 mb-8 font-medium">
+                                <span className="hover:text-trip-600 cursor-pointer transition-colors">Blog Home</span>
+                                <Icon name="chevron-right" className="w-3 h-3" />
+                                <span className="hover:text-trip-600 cursor-pointer transition-colors">{siteTag?.name}</span>
+                                <Icon name="chevron-right" className="w-3 h-3 text-trip-200" />
+                                <span className="text-trip-600 font-bold uppercase tracking-widest text-[10px]">{topicTag?.name}</span>
+                            </div>
+
+                            <div className="grid lg:grid-cols-3 gap-16">
+                                <div className="lg:col-span-2">
+                                    <h1 className="text-5xl font-black text-slate-900 mb-6 tracking-tighter leading-[1.1]">
+                                        {page.name}
+                                    </h1>
+                                    <p className="text-xl text-slate-500 leading-relaxed max-w-2xl mb-10">
+                                        The ultimate guide to {page.name}. From the most popular attractions to hidden gems, 
+                                        discover everything you need to know about visiting {siteTag?.name}'s best spots.
+                                    </p>
+
+                                    {/* Banner */}
+                                    <div className="relative aspect-[21/9] rounded-[2.5rem] overflow-hidden mb-16 bg-slate-100 group shadow-2xl">
+                                        <img 
+                                            src={`https://images.unsplash.com/photo-1542708993627-b6e5bbae43c4?auto=format&fit=crop&q=80&w=1200`} 
+                                            alt={page.name}
+                                            className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent" />
+                                        <div className="absolute bottom-10 left-10 text-white">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <span className="px-4 py-1.5 bg-accent rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">Editor's Choice</span>
+                                            </div>
+                                            <div className="text-sm font-medium opacity-90 backdrop-blur-sm bg-black/10 px-3 py-1 rounded-lg inline-block">Last Updated {formatTime(new Date().toISOString())}</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Article Cards */}
+                                    <div className="space-y-16">
+                                        <div className="flex items-center justify-between">
+                                            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-4">
+                                                <span className="w-12 h-2 bg-trip-600 rounded-full" />
+                                                Latest Stories
+                                            </h2>
+                                            <button className="text-sm font-bold text-trip-600 hover:underline">View All</button>
+                                        </div>
+                                        <div className="grid md:grid-cols-2 gap-10">
+                                            {[1, 2, 3, 4].map(i => (
+                                                <div key={i} className="group cursor-pointer">
+                                                    <div className="aspect-[16/10] bg-slate-50 rounded-[2rem] overflow-hidden mb-5 border border-slate-100 shadow-sm transition-all duration-500 group-hover:shadow-xl group-hover:-translate-y-1">
+                                                        <img 
+                                                            src={`https://images.unsplash.com/photo-${1500000000000 + (i * 1000000)}?auto=format&fit=crop&q=80&w=600`} 
+                                                            className="w-full h-full object-cover group-hover:scale-105 transition-all duration-700" 
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center gap-3 text-[10px] font-black text-trip-600 uppercase mb-3 tracking-widest">
+                                                        <span className="bg-trip-50 px-2 py-0.5 rounded">{topicTag?.name}</span>
+                                                        <span className="text-slate-300">•</span>
+                                                        <span className="text-slate-400">5 min read</span>
+                                                    </div>
+                                                    <h3 className="text-xl font-bold text-slate-900 group-hover:text-trip-600 transition-colors line-clamp-2 leading-tight">
+                                                        {i === 1 ? `Everything you need to know about ${page.name} in ${new Date().getFullYear()}` : 
+                                                         i === 2 ? `Top 10 Budget Tips for ${siteTag?.name} Travelers` :
+                                                         i === 3 ? `How to avoid crowds at ${topicTag?.name}: Expert Secrets` :
+                                                         `A Local's Guide to ${siteTag?.name}'s Hidden Districts`}
+                                                    </h3>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Sidebar */}
+                                <div className="space-y-12">
+                                    {/* hreflang & canonical info (CMS view only) */}
+                                    <div className="bg-trip-50/50 p-8 rounded-[2rem] border border-trip-100/50 shadow-sm">
+                                        <div className="text-[10px] font-black text-trip-600 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                            <Icon name="code" className="w-3 h-3" /> Technical SEO Data
+                                        </div>
+                                        <div className="space-y-5">
+                                            <div>
+                                                <div className="text-[10px] text-slate-400 font-bold mb-2 uppercase tracking-wider">Canonical URL</div>
+                                                <div className="text-[11px] font-mono bg-white p-3 rounded-xl border border-trip-100/50 truncate text-slate-600 shadow-inner">
+                                                    https://www.trip.com/blog/{page.site}/{topicTag?.slug}/{siteTag?.slug}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[10px] text-slate-400 font-bold mb-2 uppercase tracking-wider">hreflang Alternate</div>
+                                                <div className="flex flex-col gap-2">
+                                                    {LOCALES.filter(l => l.id !== page.site).slice(0, 3).map(l => (
+                                                        <div key={l.id} className="flex items-center justify-between text-[11px] px-3 py-2 bg-white rounded-xl border border-trip-100/50 shadow-sm">
+                                                            <span className="font-bold text-trip-600">{l.id.toUpperCase()}</span>
+                                                            <span className="font-mono text-slate-300">Alternate Linked</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Relevant Tags */}
+                                    <div className="px-4">
+                                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                            <Icon name="compass" className="w-4 h-4 text-trip-600" /> Discover More
+                                        </h3>
+                                        <div className="flex flex-wrap gap-2.5">
+                                            {relatedTags.map(t => (
+                                                <button key={t.id} className="px-5 py-2.5 bg-white hover:bg-trip-600 text-slate-600 hover:text-white rounded-2xl text-[11px] font-bold transition-all border border-slate-100 hover:border-trip-600 hover:shadow-lg hover:shadow-trip-100">
+                                                    #{t.name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Hot Tags */}
+                                    <div className="px-4">
+                                        <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+                                            <Icon name="trending-up" className="w-4 h-4 text-accent" /> Trending Now
+                                        </h3>
+                                        <div className="space-y-4">
+                                            {hotTags.map((t, idx) => (
+                                                <div key={t.id} className="flex items-center justify-between group cursor-pointer py-1">
+                                                    <div className="flex items-center gap-4">
+                                                        <span className="text-sm font-black text-trip-200 group-hover:text-trip-600 w-5 tracking-tighter transition-colors">{(idx + 1).toString().padStart(2, '0')}</span>
+                                                        <span className="text-sm font-bold text-slate-700 group-hover:text-trip-600 transition-colors uppercase tracking-tight">{t.name}</span>
+                                                    </div>
+                                                    <span className="text-[10px] font-mono text-slate-300 group-hover:text-trip-400">{t.articleCount}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const AuditQueueView = ({ auditItems, onApprove, onReject }) => {
+            const pending = auditItems.filter(i => i.status === 'pending');
+
+            if (pending.length === 0) {
+                return (
+                    <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-200 border-dashed">
+                        <Icon name="check-circle" className="w-12 h-12 text-emerald-100 mb-4" />
+                        <h3 className="text-xl font-black text-slate-300 uppercase tracking-widest">Queue Empty</h3>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="p-6 border-b border-slate-50 bg-slate-50/50">
+                        <h2 className="text-lg font-black text-slate-800 uppercase flex items-center gap-3">
+                            <Icon name="shield-alert" className="text-trip-600" /> Audit Candidates
+                        </h2>
+                    </div>
+                    <div className="flex-1 overflow-auto divide-y divide-slate-100 font-inter">
+                        {pending.map(item => (
+                            <div key={item.id} className="p-6 flex items-center justify-between hover:bg-trip-50/20 transition-all group">
+                                <div className="flex items-center gap-4">
+                                    <div className={`p-4 rounded-2xl border ${item.type === 'geo' ? 'bg-trip-100 border-trip-200 text-trip-700' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
+                                        <Icon name={item.type === 'geo' ? 'map-pin' : 'hash'} className="w-7 h-7" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black text-slate-800 text-xl uppercase leading-none tracking-tight">{item.name}</h4>
+                                        <div className="flex items-center gap-3 mt-3">
+                                            <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-lg uppercase tracking-wider">
+                                                <Icon name="file-text" className="w-3 h-3" /> {item.sourceArticle}
+                                            </span>
+                                            <span className="text-[10px] font-black text-trip-600 flex items-center gap-1 bg-trip-50 px-2.5 py-1 rounded-lg leading-none shadow-sm shadow-trip-100">
+                                                <Icon name="zap" className="w-3 h-3 text-accent" /> {(item.confidence * 100).toFixed(0)}% AI CONFIDENCE
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button onClick={() => onReject(item.id)} className="px-6 py-2.5 text-xs font-black text-slate-300 hover:text-red-500 uppercase tracking-widest transition-all">Discard</button>
+                                    <button onClick={() => onApprove(item.id)} className="px-8 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-slate-200 active:scale-95">Approve</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Main App ---
+        const App = () => {
+            const [activeView, setActiveView] = useState('tags');
+            const [tags, setTags] = useState(INITIAL_TAGS);
+            const [auditQueue, setAuditQueue] = useState(INITIAL_AUDIT);
+            const [tagPages, setTagPages] = useState(INITIAL_TAG_PAGES);
+            const [previewPage, setPreviewPage] = useState(null);
+
+            const handleUpdateTag = (id, updates) => {
+                setTags(prev => prev.map(t => t.id === id ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t));
+            };
+
+            const handleDeleteTag = (id) => {
+                if (confirm('Delete this tag?')) setTags(prev => prev.filter(t => t.id !== id));
+            };
+
+            const handleAddTag = (newTag) => {
+                const tag = {
+                    ...newTag,
+                    id: `new_${Date.now()}`,
+                    slug: newTag.name.toLowerCase().replace(/ /g, '-'),
+                    articleCount: 0,
+                    status: 'active',
+                    locales: {},
+                    updatedAt: new Date().toISOString()
+                };
+                setTags(prev => [tag, ...prev]);
+            };
+
+            const handleApprove = (id) => {
+                const item = auditQueue.find(i => i.id === id);
+                if (item) {
+                    handleAddTag({ name: item.name, type: item.type, description: `Suggested from ${item.sourceArticle}` });
+                    setAuditQueue(prev => prev.map(i => i.id === id ? { ...i, status: 'approved' } : i));
+                }
+            };
+
+            const handleStatusChange = (id, status) => {
+                setTagPages(prev => prev.map(p => p.id === id ? { ...p, status } : p));
+            };
+
+            const handleDeletePage = (id) => {
+                if (confirm('Delete this page?')) setTagPages(prev => prev.filter(p => p.id !== id));
+            };
+
+            const handleGeneratePage = (site, tids) => {
+                const names = tids.map(tid => tags.find(t=>t.id===tid)?.name).join(' & ');
+                const newPage = {
+                    id: `p_${Date.now()}`,
+                    name: `${names} (${site.toUpperCase()})`,
+                    site,
+                    tags: tids,
+                    articleCount: Math.floor(Math.random() * 20) + 1,
+                    status: 'pending',
+                    createdAt: new Date().toISOString()
+                };
+                setTagPages(prev => [newPage, ...prev]);
+                setActiveView('pages');
+            };
+
+            return (
+                <div className="flex h-screen w-full bg-slate-50 font-inter">
+                    <Sidebar 
+                        activeView={activeView} 
+                        setActiveView={setActiveView} 
+                        counts={{ audit: auditQueue.filter(i => i.status === 'pending').length, tags: tags.length }} 
+                    />
+                    <main className="flex-1 p-8 overflow-hidden">
+                        <AnimatePresence mode="wait">
+                            <motion.div key={activeView} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="h-full">
+                                {activeView === 'tags' && <TagManagementView tags={tags} onUpdate={handleUpdateTag} onDelete={handleDeleteTag} onAdd={handleAddTag} />}
+                                {activeView === 'editor' && <ArticleEditorView tags={tags} />}
+                                {activeView === 'audit' && <AuditQueueView auditItems={auditQueue} onApprove={handleApprove} onReject={(id)=>setAuditQueue(prev=>prev.filter(i=>i.id!==id))} />}
+                                {activeView === 'generator' && <TagPageGeneratorView tags={tags} onGenerate={handleGeneratePage} />}
+                                {activeView === 'pages' && <TagPageListView pages={tagPages} tags={tags} onDelete={handleDeletePage} onStatusChange={handleStatusChange} onPreview={setPreviewPage} />}
+                            </motion.div>
+                        </AnimatePresence>
+                    </main>
+
+                    <AnimatePresence>
+                        {previewPage && (
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 1.05 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 1.05 }}
+                                className="fixed inset-0 z-[100]"
+                            >
+                                <TagPagePreview 
+                                    page={previewPage} 
+                                    tags={tags} 
+                                    onClose={() => setPreviewPage(null)} 
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+
+        // Refresh lucide icons periodically to catch dynamically added items
+        setInterval(() => {
+            if (window.lucide) window.lucide.createIcons();
+        }, 500);
+
+    </script>
+</body>
+</html>

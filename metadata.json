@@ -1,0 +1,6 @@
+{
+  "name": "Remix: CMS Tag Management Demo",
+  "description": "A demo of an article tag management feature including AI tag generation, global tag pool, and audit queues, designed for a CMS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
