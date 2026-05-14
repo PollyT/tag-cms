@@ -6,12 +6,12 @@ import { ArrowLeft, Tag as TagIcon, Trash2, Plus, MoveRight, ExternalLink, X } f
 
 export default function TagArticlesView() {
   const { tagId, locale } = useParams();
-  const { tags, articles, bulkRemoveTagFromArticles, bulkApplyTagToArticles, addUrlsWithTag } = useApp();
+  const { tags, articles, bulkRemoveTagFromArticles, bulkApplyTagToArticles, addArticlesWithTag } = useApp();
   
   const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
   const [targetApplyTagId, setTargetApplyTagId] = useState<string>('');
-  const [isAddUrlsModalOpen, setIsAddUrlsModalOpen] = useState(false);
-  const [urlsInput, setUrlsInput] = useState('');
+  const [isAddArticlesModalOpen, setIsAddArticlesModalOpen] = useState(false);
+  const [articleIdsInput, setArticleIdsInput] = useState('');
 
   const currentTag = tags.find(t => t.id === tagId);
   const currentLocale = LOCALES.find(l => l.id === locale) || LOCALES[0];
@@ -58,13 +58,13 @@ export default function TagArticlesView() {
     }
   };
 
-  const handleAddUrls = () => {
-    const urls = urlsInput.split('\n').map(u => u.trim()).filter(Boolean);
-    if (urls.length > 0) {
-      addUrlsWithTag(urls, currentTag.id);
+  const handleAddArticles = () => {
+    const articleIds = articleIdsInput.split('\n').map(u => u.trim()).filter(Boolean);
+    if (articleIds.length > 0) {
+      addArticlesWithTag(articleIds, currentTag.id);
     }
-    setIsAddUrlsModalOpen(false);
-    setUrlsInput('');
+    setIsAddArticlesModalOpen(false);
+    setArticleIdsInput('');
   };
 
   return (
@@ -117,10 +117,10 @@ export default function TagArticlesView() {
             <div className="w-px h-6 bg-slate-200 mx-2" />
 
             <button 
-              onClick={() => setIsAddUrlsModalOpen(true)}
+              onClick={() => setIsAddArticlesModalOpen(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-medium rounded-lg transition-colors"
             >
-              <Plus className="w-4 h-4" /> Add new URLs
+              <Plus className="w-4 h-4" /> Add new articles
             </button>
           </div>
         </div>
@@ -214,40 +214,40 @@ export default function TagArticlesView() {
         </div>
       </main>
 
-      {/* Add URLs Modal */}
-      {isAddUrlsModalOpen && (
+      {/* Add Articles Modal */}
+      {isAddArticlesModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 sm:p-6">
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-5 border-b border-slate-100 shrink-0">
               <h3 className="text-xl font-bold text-gray-900">
-                Add new URLs
+                Add new articles
               </h3>
-              <button onClick={() => setIsAddUrlsModalOpen(false)} className="text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100 p-1">
+              <button onClick={() => setIsAddArticlesModalOpen(false)} className="text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100 p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
             
             <div className="p-5 overflow-y-auto space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">URLs (one per line)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Article IDs (one per line)</label>
                 <textarea 
-                  value={urlsInput}
-                  onChange={e => setUrlsInput(e.target.value)}
+                  value={articleIdsInput}
+                  onChange={e => setArticleIdsInput(e.target.value)}
                   rows={8}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono text-gray-600 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="https://example.com/article-1&#10;https://example.com/article-2"
+                  placeholder="article_123&#10;article_456"
                 />
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button 
-                  onClick={() => setIsAddUrlsModalOpen(false)}
+                  onClick={() => setIsAddArticlesModalOpen(false)}
                   className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button 
-                  onClick={handleAddUrls}
-                  disabled={!urlsInput.trim()}
+                  onClick={handleAddArticles}
+                  disabled={!articleIdsInput.trim()}
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
                 >
                   Submit

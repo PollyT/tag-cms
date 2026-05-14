@@ -5,6 +5,15 @@ import { Search, Filter, Globe, Trash2, CheckCircle, XCircle, Layout, LayoutGrid
 import { motion, AnimatePresence } from 'motion/react';
 import { TagPage } from '../lib/store';
 
+const getPageTags = (page: TagPage) => {
+  if (page.query) {
+    const tIds = new Set<string>();
+    page.query.groups.forEach(g => g.tags.forEach(t => tIds.add(t)));
+    return Array.from(tIds);
+  }
+  return page.tags || [];
+};
+
 export default function TagPageList() {
   const { tags, tagPages, toggleTagPageStatus, deleteTagPage } = useApp();
   
@@ -126,7 +135,7 @@ export default function TagPageList() {
                               {page.name}
                             </span>
                             <div className="flex flex-wrap gap-1.5 mt-2.5">
-                              {page.tags.map(tid => {
+                              {getPageTags(page).map(tid => {
                                 const tag = tags.find(t => t.id === tid);
                                 return (
                                   <span key={tid} className="px-2 py-0.5 bg-white text-slate-400 rounded-md text-[9px] font-black uppercase border border-slate-100 shadow-sm">
@@ -237,7 +246,7 @@ export default function TagPageList() {
                 </div>
                 
                 <div className="flex flex-wrap gap-1.5">
-                  {page.tags.map(tid => (
+                  {getPageTags(page).map(tid => (
                     <span key={tid} className="px-2 py-0.5 bg-slate-50 border border-slate-100 rounded-md text-[9px] font-black text-slate-400 uppercase">
                       #{tags.find(t => t.id === tid)?.name || tid}
                     </span>

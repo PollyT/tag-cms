@@ -1,23 +1,29 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../lib/AppContext';
+import { TagPageQuery } from '../lib/store';
+import { evaluateQuery } from '../lib/store';
 import { LOCALES } from '../App';
-import { Layers, Search, Globe, Plus, Info } from 'lucide-react';
+import { Layers, Search, Globe, Plus, Info, X } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export default function TagPageGenerator() {
   const { tags, articles, generateTagPage } = useApp();
   
   const [selectedSite, setSelectedSite] = useState(LOCALES[0].id);
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | 'geo' | 'general'>('all');
 
+  const [query, setQuery] = useState<TagPageQuery>({
+    globalOperator: 'AND',
+    groups: [{ id: 'g1', operator: 'AND', tags: [] }]
+  });
+  const [activeGroupId, setActiveGroupId] = useState('g1');
+
+  const activeGroup = useMemo(() => query.groups.find(g => g.id === activeGroupId) || query.groups[0], [query, activeGroupId]);
+
   const matchingArticlesCount = useMemo(() => {
-    if (selectedTagIds.length === 0) return 0;
-    return articles.filter(article => 
-      selectedTagIds.every(tid => article.tags.includes(tid))
-    ).length;
-  }, [selectedTagIds, articles]);
+    return articles.filter(article => evaluateQuery(query, article.tags)).length;
+  }, [query, articles]);
 
   const filteredTags = useMemo(() => {
     return tags.filter(t => {
@@ -28,17 +34,31 @@ export default function TagPageGenerator() {
     }).slice(0, 100);
   }, [tags, tagSearchQuery, typeFilter]);
 
-  const handleToggleTag = (tagId: string) => {
-    setSelectedTagIds(prev => 
-      prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
-    );
+  const handleToggleTag = (tagId: string, groupId?: string) => {
+    const gId = groupId || activeGroupId;
+    setQuery(q => {
+      const gIndex = q.groups.findIndex(g => g.id === gId);
+      if (gIndex === -1) return q;
+      const group = q.groups[gIndex];
+      const nextTags = group.tags.includes(tagId) 
+        ? group.tags.filter(t => t !== tagId) 
+        : [...group.tags, tagId];
+      
+      const newGroups = [...q.groups];
+      newGroups[gIndex] = { ...group, tags: nextTags };
+      return { ...q, groups: newGroups };
+    });
   };
 
   const handleGenerate = () => {
-    if (selectedTagIds.length === 0) return;
-    generateTagPage(selectedSite, selectedTagIds);
-    setSelectedTagIds([]);
-    // Optionally redirect or show success
+    const validGroups = query.groups.filter(g => g.tags.length > 0);
+    if (validGroups.length === 0) return;
+    
+    generateTagPage(selectedSite, { query });
+    setQuery({
+      globalOperator: 'AND',
+      groups: [{ id: Math.random().toString(), operator: 'AND', tags: [] }]
+    });
     alert('Landing page built! View it in the "Tag Pages" archive.');
   };
 
@@ -83,31 +103,77 @@ export default function TagPageGenerator() {
 
             <div className="pt-8 border-t border-slate-50">
               <div className="flex items-center justify-between mb-4">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Intersection</label>
-                <button 
-                  onClick={() => setSelectedTagIds([])}
-                  className="text-[10px] font-black text-red-500 hover:bg-red-50 px-2 py-1 rounded transition-colors uppercase"
-                >
-                  Reset
-                </button>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Logic Builder</label>
+                <div className="flex bg-slate-100 rounded p-1">
+                  <button 
+                    onClick={() => setQuery(q => ({...q, globalOperator: 'AND'}))}
+                    className={`px-3 py-1 text-[9px] font-black uppercase rounded transition-all ${query.globalOperator === 'AND' ? 'bg-white text-trip-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  >AND</button>
+                  <button 
+                    onClick={() => setQuery(q => ({...q, globalOperator: 'OR'}))}
+                    className={`px-3 py-1 text-[9px] font-black uppercase rounded transition-all ${query.globalOperator === 'OR' ? 'bg-white text-trip-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  >OR</button>
+                </div>
               </div>
-              <div className="flex flex-wrap gap-2 min-h-[48px]">
-                {selectedTagIds.map(tid => {
-                  const tag = tags.find(t => t.id === tid);
-                  return (
-                    <button
-                      key={tid}
-                      onClick={() => handleToggleTag(tid)}
-                      className="px-3 py-1.5 bg-trip-50 text-trip-700 rounded-lg text-[10px] font-black border border-trip-100 flex items-center gap-2 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all shadow-sm"
+
+              <div className="flex flex-col gap-3">
+                {query.groups.map((group, index) => (
+                  <div key={group.id} className="relative group/group-box">
+                    {index > 0 && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-10 bg-slate-100 px-2 py-0.5 rounded text-[8px] font-black text-slate-500 uppercase">
+                        {query.globalOperator}
+                      </div>
+                    )}
+                    <div 
+                      className={`relative p-4 rounded-xl border-2 transition-all ${activeGroupId === group.id ? 'border-trip-500 bg-trip-50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'} cursor-pointer`}
+                      onClick={() => setActiveGroupId(group.id)}
                     >
-                      {tag?.name || tid}
-                      <Plus className="w-3 h-3 rotate-45 opacity-50" />
-                    </button>
-                  );
-                })}
-                {selectedTagIds.length === 0 && (
-                  <span className="text-[11px] text-slate-300 font-bold italic uppercase tracking-widest px-1">Choose tags to intersect →</span>
-                )}
+                      <div className="flex items-center justify-between mb-3">
+                        <select 
+                          value={group.operator} 
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setQuery(q => ({...q, groups: q.groups.map(g => g.id === group.id ? {...g, operator: e.target.value as 'AND' | 'OR'} : g)}))
+                          }}
+                          className={`text-[10px] font-black uppercase px-2 py-1 rounded outline-none border transition-colors ${activeGroupId === group.id ? 'bg-white border-trip-200 text-trip-700' : 'bg-slate-50 border-transparent text-slate-500'}`}
+                        >
+                          <option value="AND">ALL (AND)</option>
+                          <option value="OR">ANY (OR)</option>
+                        </select>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setQuery(q => ({...q, groups: q.groups.filter(g => g.id !== group.id)})) }}
+                          disabled={query.groups.length === 1}
+                          className="opacity-0 group-hover/group-box:opacity-100 transition-opacity disabled:hidden"
+                        >
+                          <X className="w-4 h-4 text-slate-300 hover:text-red-500"/>
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 min-h-[24px]">
+                        {group.tags.map(tid => {
+                          const t = tags.find(tag => tag.id === tid);
+                          return (
+                            <span key={tid} className="px-2 py-1 bg-white border border-slate-200 shadow-sm text-slate-700 rounded text-[10px] font-bold flex items-center gap-1.5 transition-colors">
+                              {t?.name || tid}
+                              <button onClick={(e) => { e.stopPropagation(); handleToggleTag(tid, group.id) }} className="hover:text-red-500 transition-colors">
+                                <Plus className="w-3 h-3 rotate-45 opacity-50 hover:opacity-100" />
+                              </button>
+                            </span>
+                          )
+                        })}
+                        {group.tags.length === 0 && <span className="text-[10px] text-slate-400 italic">Select tags from pool →</span>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <button 
+                  onClick={() => {
+                     const nid = Math.random().toString();
+                     setQuery(q => ({...q, groups: [...q.groups, { id: nid, operator: 'AND', tags: [] }]}));
+                     setActiveGroupId(nid);
+                  }}
+                  className="w-full mt-2 py-3 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black uppercase text-slate-400 hover:text-trip-600 hover:border-trip-300 hover:bg-trip-50/50 transition-all flex items-center justify-center gap-2"
+                ><Plus className="w-4 h-4" /> Add Group</button>
               </div>
             </div>
           </div>
@@ -127,21 +193,13 @@ export default function TagPageGenerator() {
               </div>
             </div>
 
-            <div className="bg-trip-50 rounded-xl p-4 border border-trip-100 text-[10px] font-black text-trip-700 flex gap-4 leading-relaxed uppercase tracking-widest">
-              <Info className="w-6 h-6 shrink-0 text-trip-500" />
-              <div>
-                Exclusive AND relationship.
-                Matches must have {selectedTagIds.length} tags.
-              </div>
-            </div>
-
             <motion.button 
               whileTap={{ scale: 0.98 }}
               onClick={handleGenerate}
-              disabled={selectedTagIds.length === 0}
+              disabled={query.groups.filter(g => g.tags.length > 0).length === 0}
               className="w-full py-5 bg-trip-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-trip-700 disabled:opacity-20 disabled:grayscale shadow-2xl shadow-trip-500/30 transition-all flex items-center justify-center gap-3 active:scale-95"
             >
-              <Plus className="w-5 h-5" /> Assemble Page
+              <Layers className="w-5 h-5" /> Assemble Page
             </motion.button>
           </div>
         </div>
@@ -152,7 +210,7 @@ export default function TagPageGenerator() {
             <div className="flex items-center justify-between">
               <div>
                  <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">Tag Selection Pool</h3>
-                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Select tags to refine the intersection</p>
+                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Select tags to add to the active logic group</p>
               </div>
               <div className="px-4 py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-400 uppercase border border-slate-100 shadow-inner">
                 {filteredTags.length} CANDIDATES
@@ -193,56 +251,72 @@ export default function TagPageGenerator() {
 
           <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredTags.map(tag => (
-                <label 
-                  key={tag.id} 
-                  className={`flex flex-col p-5 rounded-2xl cursor-pointer transition-all border-2 group relative overflow-hidden ${
-                    selectedTagIds.includes(tag.id) 
-                      ? 'bg-trip-50 border-trip-600 text-trip-700 shadow-lg shadow-trip-500/5' 
-                      : 'bg-white border-transparent hover:border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className={`absolute top-0 right-0 px-3 py-1 text-[8px] font-black uppercase tracking-tight rounded-bl-xl shadow-sm ${
-                    tag.type === 'geo' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400'
-                  }`}>
-                    {tag.type}
-                  </div>
+              {filteredTags.map(tag => {
+                // Determine if this tag is in the currently ACTIVE group
+                const isActiveGroupSelected = activeGroup?.tags.includes(tag.id) || false;
+                // Determine if it is in ANY OTHER group
+                const inOtherGroups = query.groups.some(g => g.id !== activeGroupId && g.tags.includes(tag.id));
+                
+                let borderColor = 'border-transparent';
+                let bgColor = 'bg-white';
+                let checkColor = 'border-slate-200';
+                let icon = null;
 
-                  <div className="flex items-start justify-between">
-                    <div className="flex flex-col max-w-[80%]">
-                      <span className="text-sm font-black uppercase tracking-tight truncate leading-tight" title={tag.locales[selectedSite] || tag.name}>
-                        {tag.locales[selectedSite] || tag.name}
-                      </span>
-                      <span className="text-[10px] text-slate-300 font-mono mt-1 group-hover:text-trip-400 transition-colors">#{tag.id}</span>
-                    </div>
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center border-2 transition-all shrink-0 ml-2 shadow-sm ${
-                      selectedTagIds.includes(tag.id) 
-                        ? 'bg-trip-600 border-trip-600' 
-                        : 'border-slate-200 bg-white group-hover:border-trip-300'
+                if (isActiveGroupSelected) {
+                  borderColor = 'border-trip-600';
+                  bgColor = 'bg-trip-50 shadow-lg shadow-trip-500/5';
+                  checkColor = 'border-trip-600 bg-trip-600 text-white';
+                  icon = <Plus className="w-4 h-4 text-white rotate-45" />;
+                } else if (inOtherGroups) {
+                  borderColor = 'border-slate-300';
+                  bgColor = 'bg-slate-50 opacity-70';
+                  checkColor = 'border-slate-300 bg-slate-200 text-slate-500';
+                  icon = <div className="w-2 h-2 rounded-full bg-slate-400" />;
+                }
+
+                return (
+                  <label 
+                    key={tag.id} 
+                    className={`flex flex-col p-5 rounded-2xl cursor-pointer transition-all border-2 group relative overflow-hidden ${bgColor} ${borderColor} hover:border-trip-300`}
+                  >
+                    <div className={`absolute top-0 right-0 px-3 py-1 text-[8px] font-black uppercase tracking-tight rounded-bl-xl shadow-sm ${
+                      tag.type === 'geo' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400'
                     }`}>
-                      <input 
-                        type="checkbox" 
-                        className="hidden"
-                        checked={selectedTagIds.includes(tag.id)}
-                        onChange={() => handleToggleTag(tag.id)}
-                      />
-                      {selectedTagIds.includes(tag.id) && <Plus className="w-4 h-4 text-white rotate-45" />}
+                      {tag.type}
                     </div>
-                  </div>
-                  
-                  <div className="mt-4 pt-4 border-t border-slate-100/50 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[9px] font-black uppercase text-slate-300 tracking-widest">{tag.type === 'geo' ? 'Geographic' : 'General'}</span>
-                      <span className="text-[9px] font-black text-trip-600 bg-trip-50 px-2 py-0.5 rounded-md border border-trip-100">{tag.articleCount} arts</span>
+
+                    <div className="flex items-start justify-between">
+                      <div className="flex flex-col max-w-[80%]">
+                        <span className={`text-sm font-black uppercase tracking-tight truncate leading-tight ${isActiveGroupSelected ? 'text-trip-700' : 'text-slate-700'}`} title={tag.locales[selectedSite] || tag.name}>
+                          {tag.locales[selectedSite] || tag.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono mt-1 group-hover:text-trip-500 transition-colors">#{tag.id}</span>
+                      </div>
+                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center border-2 transition-all shrink-0 ml-2 shadow-sm ${checkColor}`}>
+                        <input 
+                          type="checkbox" 
+                          className="hidden"
+                          checked={isActiveGroupSelected}
+                          onChange={() => handleToggleTag(tag.id)}
+                        />
+                        {icon}
+                      </div>
                     </div>
-                    <span className="text-[11px] font-bold text-slate-400 truncate opacity-70">
-                      {tag.name}
-                    </span>
-                  </div>
-                </label>
-              ))}
+                    
+                    <div className="mt-4 pt-4 border-t border-slate-100/50 flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">{tag.type === 'geo' ? 'Geographic' : 'General'}</span>
+                        <span className="text-[9px] font-black text-trip-600 bg-trip-50 px-2 py-0.5 rounded-md border border-trip-100">{tag.articleCount} arts</span>
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-500 truncate mt-1">
+                        {tag.name}
+                      </span>
+                    </div>
+                  </label>
+                );
+              })}
               {filteredTags.length === 0 && (
-                <div className="col-span-full py-32 flex flex-col items-center justify-center text-slate-300">
+                <div className="col-span-full py-32 flex flex-col items-center justify-center text-slate-400">
                   <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
                     <Search className="w-10 h-10 opacity-20" />
                   </div>

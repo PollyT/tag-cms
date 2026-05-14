@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Tag, AuditTag, Article, TagPage, INITIAL_TAGS, INITIAL_AUDIT_QUEUE } from './store';
+import { Tag, AuditTag, Article, TagPage, TagPageQuery, evaluateQuery, INITIAL_TAGS, INITIAL_AUDIT_QUEUE } from './store';
 
 interface AppContextType {
   tags: Tag[];
@@ -16,8 +16,8 @@ interface AppContextType {
   saveArticle: (article: Article) => void;
   bulkRemoveTagFromArticles: (articleIds: string[], tagId: string) => void;
   bulkApplyTagToArticles: (articleIds: string[], tagId: string) => void;
-  addUrlsWithTag: (urls: string[], tagId: string) => void;
-  generateTagPage: (site: string, tagIds: string[]) => void;
+  addArticlesWithTag: (articleIds: string[], tagId: string) => void;
+  generateTagPage: (site: string, params: { tagIds?: string[]; query?: TagPageQuery; name?: string }) => void;
   toggleTagPageStatus: (id: string, updates: { status: TagPage['status'] }) => void;
   deleteTagPage: (id: string) => void;
 }
@@ -210,47 +210,62 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
-  const addUrlsWithTag = (urls: string[], tagId: string) => {
+  const addArticlesWithTag = (articleIds: string[], tagId: string) => {
     setArticles(prev => {
       const next = [...prev];
-      urls.forEach((url, i) => {
-        let site = url;
-        try {
-          site = new URL(url).hostname;
-        } catch (e) {
-          // ignore invalid url and use the raw string as site
+      articleIds.forEach((articleId, i) => {
+        const existingIndex = next.findIndex(a => a.id === articleId);
+        if (existingIndex >= 0) {
+          if (!next[existingIndex].tags.includes(tagId)) {
+            next[existingIndex] = {
+              ...next[existingIndex],
+              tags: [...next[existingIndex].tags, tagId]
+            };
+          }
+        } else {
+          next.push({
+            id: articleId,
+            title: `Article ${articleId}`,
+            content: '',
+            site: 'unknown-site',
+            url: `https://example.com/article/${articleId}`,
+            keyword: 'manual addition',
+            tags: [tagId]
+          });
         }
-        const id = `article_manual_${Date.now()}_${i}`;
-        next.push({
-          id,
-          title: `Newly Added Article ${i + 1}`,
-          content: '',
-          site,
-          url,
-          keyword: 'manual addition',
-          tags: [tagId]
-        });
       });
       return next;
     });
   };
 
-  const generateTagPage = (site: string, tagIds: string[]) => {
-    if (tagIds.length === 0) return;
+  const generateTagPage = (site: string, params: { tagIds?: string[]; query?: TagPageQuery; name?: string }) => {
+    const { tagIds = [], query, name: defaultName } = params;
+    if (tagIds.length === 0 && !query) return;
     
-    const selectedTags = tags.filter(t => tagIds.includes(t.id));
-    const name = selectedTags.map(t => t.name).join(' + ');
-    
-    // Count articles matching CROSS logic (must have ALL tags)
-    const count = articles.filter(a => 
-      tagIds.every(tid => a.tags.includes(tid))
-    ).length;
+    let count = 0;
+    let fallbackName = '';
+
+    if (query) {
+      count = articles.filter(a => evaluateQuery(query, a.tags)).length;
+      
+      const groupNames = query.groups.map(g => {
+        const pNames = g.tags.map(tid => tags.find(t => t.id === tid)?.name || tid);
+        return pNames.length > 1 ? `(${pNames.join(` ${g.operator} `)})` : pNames[0];
+      }).filter(Boolean);
+      
+      fallbackName = groupNames.join(` ${query.globalOperator} `) || 'Custom Query Page';
+    } else {
+      const selectedTags = tags.filter(t => tagIds.includes(t.id));
+      fallbackName = selectedTags.map(t => t.name).join(' + ');
+      count = articles.filter(a => tagIds.every(tid => a.tags.includes(tid))).length;
+    }
 
     const newPage: TagPage = {
       id: Math.random().toString(36).substr(2, 9),
       site,
       tags: tagIds,
-      name,
+      query,
+      name: defaultName || fallbackName,
       articleCount: count,
       status: 'pending',
       createdAt: new Date().toISOString(),
@@ -286,7 +301,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         saveArticle,
         bulkRemoveTagFromArticles,
         bulkApplyTagToArticles,
-        addUrlsWithTag,
+        addArticlesWithTag,
         generateTagPage,
         toggleTagPageStatus,
         deleteTagPage,

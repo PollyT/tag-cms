@@ -35,10 +35,44 @@ export type Article = {
   tags: string[]; // tag ids
 };
 
+export type TagGroup = {
+  id: string;
+  operator: 'AND' | 'OR';
+  tags: string[];
+};
+
+export type TagPageQuery = {
+  globalOperator: 'AND' | 'OR';
+  groups: TagGroup[];
+};
+
+export function evaluateQuery(query: TagPageQuery, articleTags: string[]): boolean {
+  if (!query.groups || query.groups.length === 0) return false;
+  
+  const evaluateGroup = (group: TagGroup) => {
+    if (!group.tags || group.tags.length === 0) return true; // Empty group doesn't constrain
+    if (group.operator === 'AND') {
+      return group.tags.every(tid => articleTags.includes(tid));
+    } else {
+      return group.tags.some(tid => articleTags.includes(tid));
+    }
+  };
+
+  const validGroups = query.groups.filter(g => g.tags && g.tags.length > 0);
+  if (validGroups.length === 0) return false;
+
+  if (query.globalOperator === 'AND') {
+    return validGroups.every(evaluateGroup);
+  } else {
+    return validGroups.some(evaluateGroup);
+  }
+}
+
 export type TagPage = {
   id: string;
   site: string; // locale id
-  tags: string[]; // tag ids
+  tags?: string[]; // Legacy tag ids
+  query?: TagPageQuery; // New logic query
   name: string; // calculated or user defined
   articleCount: number;
   status: 'rendering' | 'pending' | 'unpublished' | 'published';
