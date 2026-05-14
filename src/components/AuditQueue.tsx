@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../lib/AppContext';
-import { Check, X, Clock, MapPin, Tag as TagIcon, ShieldAlert, Eye, Info, Globe } from 'lucide-react';
+import { Check, X, Clock, MapPin, Tag as TagIcon, ShieldAlert, Eye, Info, Globe, FileText, CheckSquare, Square } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AuditTag } from '../lib/store';
 import { LOCALES } from '../App';
@@ -8,10 +8,37 @@ import { LOCALES } from '../App';
 export default function AuditQueue() {
   const { auditQueue, approveAuditTag, rejectAuditTag, updateAuditTag } = useApp();
   const [selectedTagInfo, setSelectedTagInfo] = useState<AuditTag | null>(null);
+  const [typeFilter, setTypeFilter] = useState<'all' | 'geo' | 'general'>('all');
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
   
-  const pendingTags = auditQueue.filter(t => t.status === 'pending');
+  const pendingTags = useMemo(() => {
+    return auditQueue.filter(t => t.status === 'pending' && (typeFilter === 'all' || t.type === typeFilter));
+  }, [auditQueue, typeFilter]);
 
-  if (pendingTags.length === 0) {
+  const handleToggleSelect = (id: string) => {
+    const next = new Set(selectedTagIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedTagIds(next);
+  };
+  
+  const handleSelectAll = () => {
+    if (selectedTagIds.size === pendingTags.length && pendingTags.length > 0) {
+      setSelectedTagIds(new Set());
+    } else {
+      setSelectedTagIds(new Set(pendingTags.map(t => t.id)));
+    }
+  };
+
+  const handleBulkApprove = () => {
+    if (selectedTagIds.size === 0) return;
+    Array.from(selectedTagIds).forEach(id => {
+      approveAuditTag(id);
+    });
+    setSelectedTagIds(new Set());
+  };
+
+  if (auditQueue.filter(t => t.status === 'pending').length === 0) {
     return (
       <div className="flex flex-col flex-1 min-w-0 w-full h-full items-center justify-center text-slate-400 space-y-6">
         <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center shadow-inner">
@@ -27,11 +54,51 @@ export default function AuditQueue() {
 
   return (
     <div className="flex flex-col flex-1 min-w-0 h-full w-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="p-6 border-b border-slate-50 bg-slate-50/50">
+      <div className="p-6 border-b border-slate-50 bg-slate-50/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <h2 className="text-lg font-black text-slate-800 flex items-center gap-3 uppercase tracking-tight">
           <ShieldAlert className="w-5 h-5 text-trip-600" />
           Audit Candidates
         </h2>
+        
+        <div className="flex items-center gap-4">
+          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+            {(['all', 'general', 'geo'] as const).map(type => (
+              <button
+                key={type}
+                onClick={() => setTypeFilter(type)}
+                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                  typeFilter === type 
+                    ? 'bg-white text-trip-600 shadow-sm' 
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+
+          <div className="h-6 w-px bg-slate-200"></div>
+
+          <button
+            onClick={handleSelectAll}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-trip-600 transition-colors"
+          >
+            {selectedTagIds.size === pendingTags.length && pendingTags.length > 0 ? (
+              <CheckSquare className="w-4 h-4 text-trip-600" />
+            ) : (
+              <Square className="w-4 h-4" />
+            )}
+            Select All
+          </button>
+
+          <button
+            onClick={handleBulkApprove}
+            disabled={selectedTagIds.size === 0}
+            className="px-4 py-2 bg-trip-600 hover:bg-trip-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Approve Selected ({selectedTagIds.size})
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -43,11 +110,21 @@ export default function AuditQueue() {
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                className="hover:bg-trip-50/20 transition-all group"
+                className={`hover:bg-trip-50/20 transition-all group ${selectedTagIds.has(tag.id) ? 'bg-trip-50/10' : ''}`}
               >
                 <div className="px-8 py-6 flex items-center justify-between">
                   {/* Info */}
                   <div className="flex items-center gap-6 flex-1">
+                    <button 
+                      onClick={() => handleToggleSelect(tag.id)}
+                      className="text-slate-300 hover:text-trip-600 transition-colors"
+                    >
+                      {selectedTagIds.has(tag.id) ? (
+                        <CheckSquare className="w-5 h-5 text-trip-600" />
+                      ) : (
+                        <Square className="w-5 h-5" />
+                      )}
+                    </button>
                     <div className={`p-4 rounded-2xl border ${tag.type === 'geo' ? 'bg-trip-100 border-trip-200 text-trip-700' : 'bg-amber-50 border-amber-100 text-amber-600'}`}>
                       {tag.type === 'geo' ? <MapPin className="w-6 h-6" /> : <TagIcon className="w-6 h-6" />}
                     </div>
@@ -88,6 +165,11 @@ export default function AuditQueue() {
                 </div>
               </motion.li>
             ))}
+            {pendingTags.length === 0 && typeFilter !== 'all' && (
+               <li className="px-8 py-12 text-center text-slate-400 text-sm font-medium">
+                 No {typeFilter} tags in the queue right now.
+               </li>
+            )}
           </AnimatePresence>
         </ul>
       </div>
