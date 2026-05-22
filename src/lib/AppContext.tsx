@@ -27,7 +27,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 // Generate some mock articles for the tags so they show up
 const generateMockArticles = (tags: Tag[]): Article[] => {
   const generated: Article[] = [];
-  const sites = ['travel-guide.com', 'world-explorer.net', 'discover-now.org'];
+  const sites = ['en', 'tw', 'hk'];
   
   const demoTagNames = [
     'China', 'Shenzhen', 'Hong Kong', 'MixC World Shenzhen Bay', 

@@ -11,6 +11,8 @@ import TagPageList from './components/TagPageList';
 import TagPageGenerator from './components/TagPageGenerator';
 import TagPagePreview from './components/TagPagePreview';
 
+import TaggedArticles from './components/TaggedArticles';
+
 export const LOCALES = [
   { id: 'en', label: 'EN' },
   { id: 'tw', label: 'TW' },
@@ -23,7 +25,7 @@ export const LOCALES = [
 ];
 
 function AppContent() {
-  const [activeTab, setActiveTab] = useState<'editor' | 'management' | 'audit' | 'tag_pages' | 'generate_tag_pages'>('management');
+  const [activeTab, setActiveTab] = useState<'editor' | 'management' | 'audit' | 'tag_pages' | 'generate_tag_pages' | 'tagged_articles'>('management');
   const [isManualTagModalOpen, setIsManualTagModalOpen] = useState(false);
   const [manualTagForm, setManualTagForm] = useState<{
     name: string;
@@ -78,6 +80,15 @@ function AppContent() {
             >
               <Tags className="w-5 h-5" />
               <span className="text-sm font-semibold tracking-tight">Tag Management</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('tagged_articles')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+                activeTab === 'tagged_articles' ? 'bg-trip-600 text-white shadow-lg shadow-trip-900/30' : 'hover:bg-slate-800'
+              }`}
+            >
+              <FileText className="w-5 h-5" />
+              <span className="text-sm font-semibold tracking-tight">Tagged Articles</span>
             </button>
             <div className="pt-6 pb-2 text-[10px] uppercase tracking-[0.2em] font-black text-slate-600 px-3">Publishing</div>
             <button 
@@ -146,6 +157,7 @@ function AppContent() {
             <h2 className="text-lg font-semibold text-slate-800">
               {activeTab === 'editor' && 'Article Editor'}
               {activeTab === 'management' && 'Tag Management Console'}
+              {activeTab === 'tagged_articles' && 'Tagged Articles Explorer'}
               {activeTab === 'audit' && 'Tag Audit Queue'}
               {activeTab === 'tag_pages' && 'Tag Page Dashboard'}
               {activeTab === 'generate_tag_pages' && 'Build New Tag Page'}
@@ -163,6 +175,7 @@ function AppContent() {
             >
               {activeTab === 'editor' && '+ New Article'}
               {activeTab === 'management' && '+ Manual Tag'}
+              {activeTab === 'tagged_articles' && 'Export View'}
               {activeTab === 'audit' && 'Force Sync'}
               {activeTab === 'tag_pages' && 'Export List'}
               {activeTab === 'generate_tag_pages' && 'View All Pages'}
@@ -175,6 +188,7 @@ function AppContent() {
         <div className="flex-1 flex p-6 gap-6 overflow-hidden">
           {activeTab === 'editor' && <ArticleEditor />}
           {activeTab === 'management' && <TagManagement />}
+          {activeTab === 'tagged_articles' && <TaggedArticles />}
           {activeTab === 'audit' && <AuditQueue />}
           {activeTab === 'tag_pages' && <TagPageList />}
           {activeTab === 'generate_tag_pages' && <TagPageGenerator />}
