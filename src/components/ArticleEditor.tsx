@@ -9,6 +9,7 @@ interface SuggestedTag {
   confidence: number;
   isNew: boolean;
   type: 'general' | 'geo';
+  category?: 'general' | 'cities' | 'country_region' | 'pois';
   matchedTag?: Tag;
 }
 
@@ -24,6 +25,7 @@ export default function ArticleEditor() {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [autocompleteTags, setAutocompleteTags] = useState<Tag[]>([]);
   const [showNewTagModal, setShowNewTagModal] = useState<{ isOpen: boolean, tagName: string }>({ isOpen: false, tagName: '' });
+  const [newTagCategory, setNewTagCategory] = useState<'general' | 'cities' | 'country_region' | 'pois'>('general');
   
   React.useEffect(() => {
     if (manualTagInput.trim()) {
@@ -93,23 +95,24 @@ export default function ArticleEditor() {
     }
   };
 
-  const handleConfirmNewTag = (type: 'general' | 'geo') => {
+  const handleConfirmNewTag = () => {
     const tagName = showNewTagModal.tagName;
+    const type = newTagCategory === 'general' ? 'general' : 'geo';
     const newSuggestion: SuggestedTag = {
       name: tagName,
       confidence: 1,
       isNew: true,
-      type: type
+      type: type,
+      category: newTagCategory
     };
     setSelectedTags([...selectedTags, newSuggestion]);
-    if (type === 'general') {
-      addToAuditQueue({
-        name: tagName,
-        confidence: 1,
-        type: type,
-        sourceArticle: title || 'Draft Article',
-      });
-    }
+    addToAuditQueue({
+      name: tagName,
+      confidence: 1,
+      type: type,
+      category: newTagCategory,
+      sourceArticle: title || 'Draft Article',
+    });
     setShowNewTagModal({ isOpen: false, tagName: '' });
     setManualTagInput('');
     setShowAutocomplete(false);
@@ -252,25 +255,34 @@ export default function ArticleEditor() {
                     The tag <strong className="text-trip-600">'{showNewTagModal.tagName}'</strong> doesn't exist yet. Would you like to suggest it for approval?
                  </p>
               </div>
-              <div className="p-6 flex flex-col gap-3">
-                 <button 
-                    onClick={() => handleConfirmNewTag('general')}
-                    className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
-                 >
-                    Request General Tag
-                 </button>
-                 <button 
-                    onClick={() => handleConfirmNewTag('geo')}
-                    className="w-full py-3 bg-trip-600 hover:bg-trip-700 text-white rounded-xl text-sm font-black uppercase tracking-widest transition-all shadow-lg shadow-trip-500/20 active:scale-95"
-                 >
-                    Request Geo Tag
-                 </button>
-                 <button 
-                    onClick={() => setShowNewTagModal({ isOpen: false, tagName: '' })}
-                    className="w-full py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-400 rounded-xl text-sm font-bold transition-all mt-2"
-                 >
-                    Cancel
-                 </button>
+              <div className="p-6 flex flex-col gap-4">
+                 <div>
+                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Category</label>
+                   <select 
+                     value={newTagCategory}
+                     onChange={(e) => setNewTagCategory(e.target.value as any)}
+                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-trip-500/20 focus:border-trip-500 outline-none transition-all"
+                   >
+                     <option value="general">General</option>
+                     <option value="cities">Cities</option>
+                     <option value="country_region">Country/Region</option>
+                     <option value="pois">POIs</option>
+                   </select>
+                 </div>
+                 <div className="flex flex-col gap-2 mt-2">
+                   <button 
+                      onClick={handleConfirmNewTag}
+                      className="w-full py-3 bg-trip-600 hover:bg-trip-700 text-white rounded-xl text-sm font-black uppercase tracking-widest transition-all shadow-lg shadow-trip-500/20 active:scale-95"
+                   >
+                      Request Tag
+                   </button>
+                   <button 
+                      onClick={() => setShowNewTagModal({ isOpen: false, tagName: '' })}
+                      className="w-full py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-400 rounded-xl text-sm font-bold transition-all mt-1"
+                   >
+                      Cancel
+                   </button>
+                 </div>
               </div>
             </motion.div>
           </div>
