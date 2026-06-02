@@ -30,9 +30,10 @@ function AppContent() {
   const [manualTagForm, setManualTagForm] = useState<{
     name: string;
     type: 'geo' | 'general';
+    category?: 'general' | 'cities' | 'country_region' | 'pois';
     description: string;
     locales: Record<string, string>;
-  }>({ name: '', type: 'general', description: '', locales: {} });
+  }>({ name: '', type: 'general', category: 'general', description: '', locales: {} });
   const { auditQueue, addToAuditQueue, tagPages } = useApp();
   const pendingCount = auditQueue.filter(t => t.status === 'pending').length;
 
@@ -43,6 +44,7 @@ function AppContent() {
     addToAuditQueue({
       name: manualTagForm.name.trim(),
       type: manualTagForm.type,
+      category: manualTagForm.category,
       description: manualTagForm.description.trim(),
       locales: manualTagForm.locales,
       sourceArticle: 'Manual Submission',
@@ -50,7 +52,7 @@ function AppContent() {
     });
     
     setIsManualTagModalOpen(false);
-    setManualTagForm({ name: '', type: 'general', description: '', locales: {} });
+    setManualTagForm({ name: '', type: 'general', category: 'general', description: '', locales: {} });
   };
 
   return (
@@ -220,16 +222,42 @@ function AppContent() {
                   />
                 </div>
                 
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Type</label>
                     <select 
                       value={manualTagForm.type}
-                      onChange={e => setManualTagForm({...manualTagForm, type: e.target.value as 'geo' | 'general'})}
+                      onChange={e => {
+                        const newType = e.target.value as 'geo' | 'general';
+                        setManualTagForm({
+                          ...manualTagForm, 
+                          type: newType,
+                          category: newType === 'general' ? 'general' : ((manualTagForm.category === 'general' || !manualTagForm.category) ? 'cities' : manualTagForm.category)
+                        });
+                      }}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-trip-500/20 focus:border-trip-500 outline-none transition-all"
                     >
                       <option value="general">General</option>
                       <option value="geo">Geo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Category</label>
+                    <select 
+                      value={manualTagForm.category || 'general'}
+                      onChange={e => setManualTagForm({...manualTagForm, category: e.target.value as any})}
+                      disabled={manualTagForm.type === 'general'}
+                      className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-trip-500/20 focus:border-trip-500 outline-none transition-all ${manualTagForm.type === 'general' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      {manualTagForm.type === 'general' ? (
+                        <option value="general">General</option>
+                      ) : (
+                        <>
+                          <option value="cities">Cities</option>
+                          <option value="country_region">Country/Region</option>
+                          <option value="pois">POIs</option>
+                        </>
+                      )}
                     </select>
                   </div>
                 </div>

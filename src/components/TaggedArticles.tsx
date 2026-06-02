@@ -71,25 +71,32 @@ export default function TaggedArticles() {
   const { articles, tags } = useApp();
   
   const [selectedSites, setSelectedSites] = useState<Set<string>>(new Set());
-  const [selectedGeoTags, setSelectedGeoTags] = useState<Set<string>>(new Set());
+  const [selectedCitiesTags, setSelectedCitiesTags] = useState<Set<string>>(new Set());
+  const [selectedCountryRegionTags, setSelectedCountryRegionTags] = useState<Set<string>>(new Set());
+  const [selectedPOIsTags, setSelectedPOIsTags] = useState<Set<string>>(new Set());
   const [selectedGeneralTags, setSelectedGeneralTags] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
 
-  const geoTags = useMemo(() => tags.filter(t => t.type === 'geo').sort((a, b) => a.name.localeCompare(b.name)), [tags]);
-  const generalTags = useMemo(() => tags.filter(t => t.type === 'general').sort((a, b) => a.name.localeCompare(b.name)), [tags]);
+  const citiesTags = useMemo(() => tags.filter(t => t.type === 'geo' && t.category === 'cities').sort((a, b) => a.name.localeCompare(b.name)), [tags]);
+  const countryRegionTags = useMemo(() => tags.filter(t => t.type === 'geo' && t.category === 'country_region').sort((a, b) => a.name.localeCompare(b.name)), [tags]);
+  const poisTags = useMemo(() => tags.filter(t => t.type === 'geo' && t.category === 'pois').sort((a, b) => a.name.localeCompare(b.name)), [tags]);
+  const generalTags = useMemo(() => tags.filter(t => t.type === 'general' || (t.type === 'geo' && !t.category)).sort((a, b) => a.name.localeCompare(b.name)), [tags]);
 
   const filteredArticles = useMemo(() => {
     return articles.filter(article => {
       // Filter by Site
       if (selectedSites.size > 0 && !selectedSites.has(article.site)) return false;
 
-      // Filter by Geo Tags (OR within geo tags, or AND across all? "can select multiple tag filters to get results" usually implies AND across different types, OR within the same, but let's implement AND so if you pick "Tokyo" and "Theme Parks", you get both)
-      // Let's implement ANY of the selected tags MUST be present, or ALL selected tags MUST be present?
-      // Usually users want ALL selected tags to be present (intersection) when filtering down
-      const selectedTags = new Set([...selectedGeoTags, ...selectedGeneralTags]);
+      // Filter by Tags (AND across all)
+      const selectedTags = new Set([
+        ...selectedCitiesTags, 
+        ...selectedCountryRegionTags, 
+        ...selectedPOIsTags, 
+        ...selectedGeneralTags
+      ]);
       if (selectedTags.size > 0) {
         const hasAllSelectedTags = Array.from(selectedTags).every(tId => article.tags.includes(tId));
-        if (!hasAllSelectedTags) return false;
+      if (!hasAllSelectedTags) return false;
       }
 
       // Filter by Search Query
@@ -102,7 +109,7 @@ export default function TaggedArticles() {
 
       return true;
     });
-  }, [articles, selectedSites, selectedGeoTags, selectedGeneralTags, searchQuery]);
+  }, [articles, selectedSites, selectedCitiesTags, selectedCountryRegionTags, selectedPOIsTags, selectedGeneralTags, searchQuery]);
 
   const toggleSet = (set: Set<string>, value: string, setter: React.Dispatch<React.SetStateAction<Set<string>>>) => {
     const next = new Set(set);
@@ -142,11 +149,25 @@ export default function TaggedArticles() {
             toggleOption={(val) => toggleSet(selectedSites, val, setSelectedSites)}
           />
           <FilterDropdown
-            label="Geo Tags"
+            label="Cities"
             icon={MapPin}
-            options={geoTags.map(t => ({ id: t.id, name: t.name }))}
-            selected={selectedGeoTags}
-            toggleOption={(val) => toggleSet(selectedGeoTags, val, setSelectedGeoTags)}
+            options={citiesTags.map(t => ({ id: t.id, name: t.name }))}
+            selected={selectedCitiesTags}
+            toggleOption={(val) => toggleSet(selectedCitiesTags, val, setSelectedCitiesTags)}
+          />
+          <FilterDropdown
+            label="Country / Region"
+            icon={MapPin}
+            options={countryRegionTags.map(t => ({ id: t.id, name: t.name }))}
+            selected={selectedCountryRegionTags}
+            toggleOption={(val) => toggleSet(selectedCountryRegionTags, val, setSelectedCountryRegionTags)}
+          />
+          <FilterDropdown
+            label="POIs"
+            icon={MapPin}
+            options={poisTags.map(t => ({ id: t.id, name: t.name }))}
+            selected={selectedPOIsTags}
+            toggleOption={(val) => toggleSet(selectedPOIsTags, val, setSelectedPOIsTags)}
           />
           <FilterDropdown
             label="General Tags"

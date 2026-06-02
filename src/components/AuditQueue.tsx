@@ -8,12 +8,15 @@ import { LOCALES } from '../App';
 export default function AuditQueue() {
   const { auditQueue, approveAuditTag, rejectAuditTag, updateAuditTag } = useApp();
   const [selectedTagInfo, setSelectedTagInfo] = useState<AuditTag | null>(null);
-  const [typeFilter, setTypeFilter] = useState<'all' | 'geo' | 'general'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'general' | 'cities' | 'country_region' | 'pois'>('all');
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
   
   const pendingTags = useMemo(() => {
-    return auditQueue.filter(t => t.status === 'pending' && (typeFilter === 'all' || t.type === typeFilter));
-  }, [auditQueue, typeFilter]);
+    return auditQueue.filter(t => t.status === 'pending').filter(t => {
+      const tagCategory = t.category || (t.type === 'general' ? 'general' : 'cities');
+      return categoryFilter === 'all' || tagCategory === categoryFilter;
+    });
+  }, [auditQueue, categoryFilter]);
 
   const handleToggleSelect = (id: string) => {
     const next = new Set(selectedTagIds);
@@ -62,19 +65,17 @@ export default function AuditQueue() {
         
         <div className="flex items-center gap-4">
           <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
-            {(['all', 'general', 'geo'] as const).map(type => (
-              <button
-                key={type}
-                onClick={() => setTypeFilter(type)}
-                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                  typeFilter === type 
-                    ? 'bg-white text-trip-600 shadow-sm' 
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {type}
-              </button>
-            ))}
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value as any)}
+              className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-slate-500 focus:ring-0 outline-none pr-8 py-1.5 pl-4 cursor-pointer hover:text-slate-700 transition-colors"
+            >
+              <option value="all">All Categories</option>
+              <option value="general">General</option>
+              <option value="cities">Cities</option>
+              <option value="country_region">Country/Region</option>
+              <option value="pois">POIs</option>
+            </select>
           </div>
 
           <div className="h-6 w-px bg-slate-200"></div>
@@ -165,9 +166,9 @@ export default function AuditQueue() {
                 </div>
               </motion.li>
             ))}
-            {pendingTags.length === 0 && typeFilter !== 'all' && (
+            {pendingTags.length === 0 && categoryFilter !== 'all' && (
                <li className="px-8 py-12 text-center text-slate-400 text-sm font-medium">
-                 No {typeFilter} tags in the queue right now.
+                 No {categoryFilter.replace('_', ' ')} tags in the queue right now.
                </li>
             )}
           </AnimatePresence>
@@ -201,16 +202,42 @@ export default function AuditQueue() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Type</label>
                   <select 
                     value={selectedTagInfo.type}
-                    onChange={e => setSelectedTagInfo({...selectedTagInfo, type: e.target.value as 'geo' | 'general'})}
+                    onChange={e => {
+                      const newType = e.target.value as 'geo' | 'general';
+                      setSelectedTagInfo({
+                        ...selectedTagInfo, 
+                        type: newType,
+                        category: newType === 'general' ? 'general' : ((selectedTagInfo.category === 'general' || !selectedTagInfo.category) ? 'cities' : selectedTagInfo.category)
+                      });
+                    }}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-trip-500/20 focus:border-trip-500 outline-none transition-all"
                   >
                     <option value="general">General Topic</option>
                     <option value="geo">Geographic</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Category</label>
+                  <select 
+                    value={selectedTagInfo.category || 'general'}
+                    onChange={e => setSelectedTagInfo({...selectedTagInfo, category: e.target.value as any})}
+                    disabled={selectedTagInfo.type === 'general'}
+                    className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-trip-500/20 focus:border-trip-500 outline-none transition-all ${selectedTagInfo.type === 'general' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {selectedTagInfo.type === 'general' ? (
+                      <option value="general">General</option>
+                    ) : (
+                      <>
+                        <option value="cities">Cities</option>
+                        <option value="country_region">Country/Region</option>
+                        <option value="pois">POIs</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>

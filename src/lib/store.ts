@@ -6,6 +6,7 @@ export type Tag = {
   description: string;
   h1: string;
   type: 'geo' | 'general';
+  category?: 'general' | 'cities' | 'country_region' | 'pois';
   articleCount: number;
   status: 'active' | 'disabled';
   createdAt: string;
@@ -21,6 +22,7 @@ export type AuditTag = {
   sourceArticle: string;
   confidence: number;
   type: 'general' | 'geo';
+  category?: 'general' | 'cities' | 'country_region' | 'pois';
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
 };
@@ -85,8 +87,34 @@ const tagStrings = [
   'Airports', 'Train Stations', 'Lounge', 'Luggage Storage', 'Duty-Free', 'Airport Food', 'Transit/Layovers', 'Locker Info', 'Platform Guide', 'City Transportation', 'A-to-B Travel', 'Airport to City', 'KTX', 'Europe Rail', 'Shinkasen', 'JR Pass', 'China Train', 'Maps', 'Metro Map', 'Metro', 'City Bus', 'Taxis', 'Transit Cards', 'Car Rental', 'Car Charter', 'Cross-border', 'Walking Tours', 'Flight Deals', 'Carry-on Rules', 'Airlines', 'Checked Luggage', 'Airline Ticket Policy', 'Refunds', 'Airline News', 'Airline Alliance', 'Airline Miles', 'Flight Check-in', 'Airline Seat', 'Flight Logistics', 'Hotels', 'Resorts', 'Alternative Stays', 'Family-Friendly Hotels', 'All-Inclusive Resort', 'Luxury Hotel', 'Budget Hostel', 'Ryokan', 'Workation-Friendly', 'Hotel Check-in', 'Themed Hotels', 'Long Stay', 'Backpacker', 'Staycation', 'Trip.com', 'Credit Card', 'Promo Code', 'Booking Fees', 'Booking Process', 'Member Rewards', 'Refund Policy', 'Deals', 'Flash Sales', 'Visa', 'Passport', 'Arrival Cards', 'eSIM/Phone', 'Travel Apps', 'Plug/Adapters', 'Payments', 'Tax Refund (VAT)', 'Travel Budget', 'Currency Exchange', 'Weather', 'Public Holiday', 'Travel Policy', 'Pack List', 'Things to Do', 'Solo Trip', 'Family-Friendly', 'Pet-Friendly', 'Couple Trip', 'Luxury Trip', 'Budget Travel', 'Muslim-Friendly', 'Attractions', 'Best Time to Visit', 'Day Trip', 'Shopping', 'Souvenirs', 'DIY Travel', 'Guided Tours', 'Itineraries', 'Group Tours', 'Museums', 'Nature', 'Parks', 'Spa&Massage', 'Culture&Arts', 'Costume Rental', 'Theme Parks', 'Zoo', 'Tickets', 'Entertainment', 'Traveling with Children', 'Traveling with Pets', 'Nightlife', 'Cafe', 'Restaurants', 'Fine Dining', 'Dietary Needs', 'Breakfast', 'Seasonal Food', 'Must-Eat Lists', 'Concerts&Shows', 'Esports&Sports', 'Event Ticketing', 'Event Venues', 'Skiing', 'Cherry Blossom', 'Hot Spring', 'Christmas', 'Valentine', 'New Year', 'Snowboarding', 'Sauna', 'Summer Holiday', 'Fireworks', 'White Day', 'Halloween', 'Autumn Leaves', 'MixC World Shenzhen Bay', 'Skyworthland CINITY Cinema', 'CGV Cinema Futian', 'KK MALL', 'Huanle Coast'
 ];
 
-const geoTagStrings = [
-  'China', 'Japan', 'Shenzhen', 'Hong Kong', 'Tokyo', 'Shanghai', 'Guangzhou', 'Zhuhai', 'Osaka', 'Fukuoka', 'Chengdu', 'Beijing', 'Chongqing', 'Harbin', 'Xi\'an', 'Xiamen', 'Hangzhou', 'Nagoya', 'Okinawa', 'Zhangjiajie', 'Kyoto', 'Sapporo', 'Sanya'
+const geoTagsData = [
+  { name: 'China', category: 'country_region' as const },
+  { name: 'Japan', category: 'country_region' as const },
+  { name: 'Hong Kong', category: 'country_region' as const },
+  { name: 'Okinawa', category: 'country_region' as const },
+  { name: 'Shenzhen', category: 'cities' as const },
+  { name: 'Tokyo', category: 'cities' as const },
+  { name: 'Shanghai', category: 'cities' as const },
+  { name: 'Guangzhou', category: 'cities' as const },
+  { name: 'Zhuhai', category: 'cities' as const },
+  { name: 'Osaka', category: 'cities' as const },
+  { name: 'Fukuoka', category: 'cities' as const },
+  { name: 'Chengdu', category: 'cities' as const },
+  { name: 'Beijing', category: 'cities' as const },
+  { name: 'Chongqing', category: 'cities' as const },
+  { name: 'Harbin', category: 'cities' as const },
+  { name: 'Xi\'an', category: 'cities' as const },
+  { name: 'Xiamen', category: 'cities' as const },
+  { name: 'Hangzhou', category: 'cities' as const },
+  { name: 'Nagoya', category: 'cities' as const },
+  { name: 'Zhangjiajie', category: 'cities' as const },
+  { name: 'Kyoto', category: 'cities' as const },
+  { name: 'Sapporo', category: 'cities' as const },
+  { name: 'Sanya', category: 'cities' as const },
+  { name: 'Tokyo Disneyland', category: 'pois' as const },
+  { name: 'MixC World Shenzhen Bay', category: 'pois' as const },
+  { name: 'Huanle Coast', category: 'pois' as const },
+  { name: 'CGV Cinema Futian', category: 'pois' as const }
 ];
 
 const translations: Record<string, Record<string, string>> = {
@@ -162,6 +190,7 @@ export const INITIAL_TAGS: Tag[] = [
       name, // Master English name
       slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
       type: 'general' as const,
+      category: 'general' as const,
       locales: trans ? { ...trans } : {
         tw: `${name}`,
         hk: `${name}`,
@@ -179,24 +208,25 @@ export const INITIAL_TAGS: Tag[] = [
       updatedAt: new Date().toISOString(),
     };
   }),
-  ...geoTagStrings.map((name, i) => {
-    const trans = translations[name];
+  ...geoTagsData.map((data, i) => {
+    const trans = translations[data.name];
     return {
       id: String(tagStrings.length + i + 1),
-      name, // Master English name
-      slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
+      name: data.name, // Master English name
+      slug: data.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
       type: 'geo' as const,
+      category: data.category,
       locales: trans ? { ...trans } : {
-        tw: `${name}`,
-        hk: `${name}`,
-        jp: `${name}`,
-        kr: `${name}`,
-        th: `${name}`,
-        ru: `${name}`,
-        my: `${name}`,
+        tw: `${data.name}`,
+        hk: `${data.name}`,
+        jp: `${data.name}`,
+        kr: `${data.name}`,
+        th: `${data.name}`,
+        ru: `${data.name}`,
+        my: `${data.name}`,
       },
-      description: `${name} destinations`,
-      h1: name,
+      description: `${data.name} destinations`,
+      h1: data.name,
       articleCount: Math.floor(Math.random() * 100),
       status: 'active' as const,
       createdAt: new Date().toISOString(),
@@ -206,17 +236,17 @@ export const INITIAL_TAGS: Tag[] = [
 ];
 
 export const INITIAL_AUDIT_QUEUE: AuditTag[] = [
-  { id: 'a1', name: 'China', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 1.00, type: 'geo', status: 'pending', createdAt: new Date().toISOString() },
-  { id: 'a2', name: 'Shenzhen', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 1.00, type: 'geo', status: 'pending', createdAt: new Date().toISOString() },
-  { id: 'a3', name: 'Hong Kong', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.70, type: 'geo', status: 'pending', createdAt: new Date().toISOString() },
-  { id: 'a4', name: 'MixC World Shenzhen Bay', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.80, type: 'general', status: 'pending', createdAt: new Date().toISOString() },
-  { id: 'a5', name: 'Skyworthland CINITY Cinema', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.70, type: 'general', status: 'pending', createdAt: new Date().toISOString() },
-  { id: 'a6', name: 'CGV Cinema Futian', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.70, type: 'general', status: 'pending', createdAt: new Date().toISOString() },
-  { id: 'a7', name: 'KK MALL', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.60, type: 'general', status: 'pending', createdAt: new Date().toISOString() },
-  { id: 'a8', name: 'Huanle Coast', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.60, type: 'general', status: 'pending', createdAt: new Date().toISOString() },
-  { id: 'a9', name: 'Entertainment', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 1.00, type: 'general', status: 'pending', createdAt: new Date().toISOString() },
-  { id: 'a10', name: 'Tickets', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.90, type: 'general', status: 'pending', createdAt: new Date().toISOString() },
-  { id: 'a11', name: 'Cross-border', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.90, type: 'general', status: 'pending', createdAt: new Date().toISOString() },
-  { id: 'a12', name: 'Things to Do', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.80, type: 'general', status: 'pending', createdAt: new Date().toISOString() },
-  { id: 'a13', name: 'Day Trip', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.80, type: 'general', status: 'pending', createdAt: new Date().toISOString() },
+  { id: 'a1', name: 'China', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 1.00, type: 'geo', category: 'country_region', status: 'pending', createdAt: new Date().toISOString() },
+  { id: 'a2', name: 'Shenzhen', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 1.00, type: 'geo', category: 'cities', status: 'pending', createdAt: new Date().toISOString() },
+  { id: 'a3', name: 'Hong Kong', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.70, type: 'geo', category: 'country_region', status: 'pending', createdAt: new Date().toISOString() },
+  { id: 'a4', name: 'MixC World Shenzhen Bay', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.80, type: 'geo', category: 'pois', status: 'pending', createdAt: new Date().toISOString() },
+  { id: 'a5', name: 'Skyworthland CINITY Cinema', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.70, type: 'geo', category: 'pois', status: 'pending', createdAt: new Date().toISOString() },
+  { id: 'a6', name: 'CGV Cinema Futian', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.70, type: 'geo', category: 'pois', status: 'pending', createdAt: new Date().toISOString() },
+  { id: 'a7', name: 'KK MALL', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.60, type: 'geo', category: 'pois', status: 'pending', createdAt: new Date().toISOString() },
+  { id: 'a8', name: 'Huanle Coast', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.60, type: 'geo', category: 'pois', status: 'pending', createdAt: new Date().toISOString() },
+  { id: 'a9', name: 'Entertainment', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 1.00, type: 'general', category: 'general', status: 'pending', createdAt: new Date().toISOString() },
+  { id: 'a10', name: 'Tickets', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.90, type: 'general', category: 'general', status: 'pending', createdAt: new Date().toISOString() },
+  { id: 'a11', name: 'Cross-border', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.90, type: 'general', category: 'general', status: 'pending', createdAt: new Date().toISOString() },
+  { id: 'a12', name: 'Things to Do', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.80, type: 'general', category: 'general', status: 'pending', createdAt: new Date().toISOString() },
+  { id: 'a13', name: 'Day Trip', sourceArticle: 'Weekend Getaway to Shenzhen', confidence: 0.80, type: 'general', category: 'general', status: 'pending', createdAt: new Date().toISOString() },
 ];

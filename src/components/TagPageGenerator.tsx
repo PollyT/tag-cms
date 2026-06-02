@@ -11,7 +11,7 @@ export default function TagPageGenerator() {
   
   const [selectedSite, setSelectedSite] = useState(LOCALES[0].id);
   const [tagSearchQuery, setTagSearchQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'geo' | 'general'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'general' | 'cities' | 'country_region' | 'pois'>('all');
 
   const [query, setQuery] = useState<TagPageQuery>({
     globalOperator: 'AND',
@@ -29,10 +29,11 @@ export default function TagPageGenerator() {
     return tags.filter(t => {
       const matchesSearch = t.name.toLowerCase().includes(tagSearchQuery.toLowerCase()) ||
         Object.values(t.locales).some(loc => loc.toLowerCase().includes(tagSearchQuery.toLowerCase()));
-      const matchesType = typeFilter === 'all' || t.type === typeFilter;
-      return matchesSearch && matchesType;
+      const tagCategory = t.category || (t.type === 'general' ? 'general' : 'cities');
+      const matchesCategory = categoryFilter === 'all' || tagCategory === categoryFilter;
+      return matchesSearch && matchesCategory;
     }).slice(0, 100);
-  }, [tags, tagSearchQuery, typeFilter]);
+  }, [tags, tagSearchQuery, categoryFilter]);
 
   const handleToggleTag = (tagId: string, groupId?: string) => {
     const gId = groupId || activeGroupId;
@@ -232,19 +233,17 @@ export default function TagPageGenerator() {
               </div>
               
               <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
-                {(['all', 'general', 'geo'] as const).map(type => (
-                  <button
-                    key={type}
-                    onClick={() => setTypeFilter(type)}
-                    className={`px-6 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                      typeFilter === type 
-                        ? 'bg-white text-trip-600 shadow-lg' 
-                        : 'text-slate-400 hover:text-slate-600'
-                    }`}
-                  >
-                    {type}
-                  </button>
-                ))}
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value as any)}
+                  className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-slate-500 focus:ring-0 outline-none pr-8 py-2.5 pl-4 cursor-pointer hover:text-slate-700 transition-colors"
+                >
+                  <option value="all">All Categories</option>
+                  <option value="general">General</option>
+                  <option value="cities">Cities</option>
+                  <option value="country_region">Country/Region</option>
+                  <option value="pois">POIs</option>
+                </select>
               </div>
             </div>
           </div>

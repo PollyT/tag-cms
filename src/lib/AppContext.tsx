@@ -164,6 +164,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         slug: auditTag.slug || auditTag.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, ''),
         locales: auditTag.locales || {},
         type: auditTag.type,
+        category: auditTag.category,
         description: auditTag.description || `Auto-approved tag for ${auditTag.name}`,
         h1: auditTag.name,
         status: 'active',

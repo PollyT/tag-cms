@@ -21,7 +21,7 @@ export default function TagManagement() {
   const [editingTag, setEditingTag] = useState<Tag | null>(null);
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [selectedLocale, setSelectedLocale] = useState('en');
-  const [typeFilter, setTypeFilter] = useState<'all' | 'geo' | 'general'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'general' | 'cities' | 'country_region' | 'pois'>('all');
 
   // Filter tags
   const filteredTags = tags.filter(t => {
@@ -30,8 +30,9 @@ export default function TagManagement() {
       (Object.values(t.locales || {}) as string[]).some(l => 
         l && l.toLowerCase().includes(searchTerm.toLowerCase())
       );
-    const matchesType = typeFilter === 'all' || t.type === typeFilter;
-    return matchesSearch && matchesType;
+    const tagCategory = t.category || (t.type === 'general' ? 'general' : 'cities');
+    const matchesCategory = categoryFilter === 'all' || tagCategory === categoryFilter;
+    return matchesSearch && matchesCategory;
   });
 
   const toggleSelectAll = () => {
@@ -88,13 +89,15 @@ export default function TagManagement() {
           </div>
           <div className="flex items-center gap-2">
             <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as any)}
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value as any)}
               className="bg-white border border-slate-200 text-slate-700 text-sm rounded-xl focus:ring-2 focus:ring-trip-500/20 py-2 px-3 outline-none transition-all"
             >
-              <option value="all">All Types</option>
+              <option value="all">All Categories</option>
               <option value="general">General</option>
-              <option value="geo">Geo</option>
+              <option value="cities">Cities</option>
+              <option value="country_region">Country/Region</option>
+              <option value="pois">POIs</option>
             </select>
           </div>
           <div className="flex items-center gap-2">
@@ -142,6 +145,7 @@ export default function TagManagement() {
               <th className="px-6 py-4 font-black">Master</th>
               <th className="px-6 py-4 font-black">Tag Name</th>
               <th className="px-6 py-4 font-black">Type</th>
+              <th className="px-6 py-4 font-black">Category</th>
               <th className="px-6 py-4 font-black">Site</th>
               <th className="px-6 py-4 font-black">Articles</th>
               <th className="px-6 py-4 font-black">Status</th>
@@ -172,6 +176,13 @@ export default function TagManagement() {
                   <span className={`inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${tag.type === 'geo' ? 'bg-trip-100 text-trip-700' : 'bg-amber-50 text-amber-600'}`}>
                     {tag.type}
                   </span>
+                </td>
+                <td className="px-6 py-4 text-slate-500 font-medium">
+                  {tag.category ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 capitalize">
+                      {tag.category.replace('_', ' ')}
+                    </span>
+                  ) : <span className="text-slate-300 italic text-[10px]">—</span>}
                 </td>
                 <td className="px-6 py-4 text-slate-500 font-medium">
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200 shadow-sm uppercase">
@@ -247,16 +258,42 @@ export default function TagManagement() {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-trip-500/20 focus:border-trip-500 outline-none transition-all" 
                   />
                 </div>
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Type</label>
                     <select 
                       value={editingTag.type}
-                      onChange={e => setEditingTag({...editingTag, type: e.target.value as 'geo' | 'general'})}
+                      onChange={e => {
+                        const newType = e.target.value as 'geo' | 'general';
+                        setEditingTag({
+                          ...editingTag, 
+                          type: newType,
+                          category: newType === 'general' ? 'general' : ((editingTag.category === 'general' || !editingTag.category) ? 'cities' : editingTag.category)
+                        });
+                      }}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-trip-500/20 focus:border-trip-500 outline-none transition-all"
                     >
                       <option value="general">General</option>
                       <option value="geo">Geo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Category</label>
+                    <select 
+                      value={editingTag.category || 'general'}
+                      onChange={e => setEditingTag({...editingTag, category: e.target.value as any})}
+                      disabled={editingTag.type === 'general'}
+                      className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-trip-500/20 focus:border-trip-500 outline-none transition-all ${editingTag.type === 'general' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      {editingTag.type === 'general' ? (
+                        <option value="general">General</option>
+                      ) : (
+                        <>
+                          <option value="cities">Cities</option>
+                          <option value="country_region">Country/Region</option>
+                          <option value="pois">POIs</option>
+                        </>
+                      )}
                     </select>
                   </div>
                 </div>
